@@ -116,11 +116,24 @@ async def setup_funda():
 
 @app.get("/health")
 async def health():
+    import time
+    cloud_mode = not CREATIVOS_DIR.exists()
     checks = {
-        "agent_state": (LEVIA_DIR / "11_MARKETING_AGENCY" / "agent_state.json").exists(),
-        "pending_manual": (LEVIA_DIR / "12_CREATIVOS_UGC" / "pending_manual.json").exists(),
-        "creativos_dir": CREATIVOS_DIR.exists(),
-        "ugc_output_dir": UGC_OUTPUT_DIR.exists(),
+        "webhooks": True,           # Railway recibe Shopify webhooks
+        "email_automation": True,   # APScheduler + Resend activo
+        "templates": (BASE_DIR / "templates").exists(),
+        "env_shopify": bool(os.getenv("SHOPIFY_TOKEN")),
+        "env_meta": bool(os.getenv("META_ACCESS_TOKEN")),
+        "env_resend": bool(os.getenv("RESEND_API_KEY")),
+        # Archivos locales — solo disponibles en Mac
+        "local_creativos": CREATIVOS_DIR.exists(),
+        "local_ugc": UGC_OUTPUT_DIR.exists(),
     }
-    status = "ok" if all(checks.values()) else "degraded"
-    return JSONResponse({"status": status, "checks": checks})
+    cloud_critical = ["webhooks", "email_automation", "templates", "env_shopify", "env_resend"]
+    status = "ok" if all(checks[k] for k in cloud_critical) else "degraded"
+    return JSONResponse({
+        "status": status,
+        "mode": "cloud" if cloud_mode else "local",
+        "uptime_since": os.getenv("RAILWAY_DEPLOYMENT_ID", "local"),
+        "checks": checks,
+    })
