@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block title %}Banco Nu{% endblock %}
+{% block page_title %}Banco — Nu México{% endblock %}
+{% block page_sub %}{{ total_count }} transacciones importadas{% endblock %}
+
+{% block content %}
+
+{# ── Upload success ─────────────────────────────────────────────────────── #}
+{% if upload_success %}
+<div style="background:#d1fae5;border-left:3px solid #34d399;padding:10px 14px;border-radius:8px;font-size:13px;color:#065f46;margin-bottom:20px;">
+  {{ upload_success }}
+</div>
+{% endif %}
+
+{# ── Upload zone ────────────────────────────────────────────────────────── #}
+<div class="card" style="margin-bottom:24px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+    <div>
+      <div class="section-title" style="margin:0 0 4px;">Importar CSV de Nu</div>
+      <div style="font-size:12.5px;color:var(--ink-soft);">
+        Nu app → <strong>Estados de cuenta</strong> → <strong>Exportar CSV</strong> → sube el archivo aquí.
+        Las transacciones nuevas se agregan sin duplicar.
+      </div>
+    </div>
+    <form action="/bank/upload" method="post" enctype="multipart/form-data"
+          style="display:flex;gap:10px;align-items:center;">
+      <label for="csvfile"
+             style="display:inline-block;padding:8px 16px;background:var(--bone-soft);border:1px dashed var(--border);border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;color:var(--ink-soft);">
+        📂 Seleccionar CSV
+      </label>
+      <input id="csvfile" type="file" name="file" accept=".csv" required
+             onchange="this.labels[0].textContent = this.files[0]?.name || '📂 Seleccionar CSV'"
+             style="display:none;" />
+      <button type="submit"
+              style="padding:8px 18px;background:var(--ink);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">
+        Importar
+      </button>
+    </form>
+  </div>
+</div>
+
+{% if has_data %}
+
+{# ── Summary cards ──────────────────────────────────────────────────────── #}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-bottom:24px;">
+
+  <div class="card card-sm">
+    <div class="stat-label">Saldo Actual Nu</div>
+    <div class="stat-value" style="color:{{ '#065f46' if summary.balance >= 0 else '#991b1b' }};">
+      ${{ "{:,.0f}".format(summary.balance) }}
+    </div>
+    <div class="stat-sub">MXN</div>
+  </div>
+
+  <div class="card card-sm">
+    <div class="stat-label">Ingresos (período)</div>
+    <div class="stat-value" style="color:#065f46;">${{ "{:,.0f}".format(summary.income) }}</div>
+    <div class="stat-sub">MXN · cobros + transferencias</div>
+  </div>
+
+  <div class="card card-sm">
+    <div class="stat-label">Gastos (período)</div>
+    <div class="stat-value" style="color:#991b1b;">${{ "{:,.0f}".format(summary.expenses) }}</div>
+    <div class="stat-sub">MXN · total egresos</div>
+  </div>
+
+  <div class="card card-sm">
+    <div class="stat-label">Balance Neto</div>
+    {% set net = summary.income - summary.expenses %}
+    <div class="stat-value" style="color:{{ '#065f46' if net >= 0 else '#991b1b' }};">
+      {{ "+" if net >= 0 else "" }}${{ "{:,.0f}".format(net) }}
+    </div>
+    <div class="stat-sub">MXN</div>
+  </div>
+
+</div>
+
+{# ── Gastos por categoría ────────────────────────────────────────────────── #}
+{% if summary.by_category %}
+<div class="card" style="margin-bottom:24px;">
+  <div class="section-title">Gastos por Categoría</div>
+  <div style="display:grid;gap:10px;">
+    {% set max_val = summary.by_category.values() | max %}
+    {% for cat, amount in summary.by_category.items() %}
+    <div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+        <span style="font-size:13px;font-weight:500;">{{ cat }}</span>
+        <span style="font-size:13px;color:var(--ink-soft);">${{ "{:,.0f}".format(amount) }} MXN</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" style="width:{{ (amount / max_val * 100) | int }}%;background:{% if cat in ['Meta','TikTok'] %}#6B8FB5{% elif cat == 'Cobro LEVIA' %}#34d399{% else %}#C8A15A{% endif %};"></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{# ── Transactions table ──────────────────────────────────────────────────── #}
+<div class="card">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+    <div class="section-title" style="margin:0;">Transacciones ({{ total_count }} total · mostrando {{ transactions | length }})</div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="filterTx('all')" id="txf-all"
+              style="padding:4px 12px;border-radius:5px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--ink);color:#fff;cursor:pointer;">Todas</button>
+      <button onclick="filterTx('in')" id="txf-in"
+              style="padding:4px 12px;border-radius:5px;font-size:11px;font-weight:600;border:1px solid var(--border);background:#fff;color:var(--ink-soft);cursor:pointer;">Ingresos</button>
+      <button onclick="filterTx('out')" id="txf-out"
+              style="padding:4px 12px;border-radius:5px;font-size:11px;font-weight:600;border:1px solid var(--border);background:#fff;color:var(--ink-soft);cursor:pointer;">Gastos</button>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Descripción</th>
+        <th>Categoría</th>
+        <th style="text-align:right;">Monto</th>
+        <th style="text-align:right;">Saldo</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for tx in transactions %}
+      <tr class="tx-row" data-dir="{{ 'in' if tx.is_income else 'out' }}">
+        <td style="white-space:nowrap;color:var(--ink-soft);font-size:12px;">{{ tx.date }}</td>
+        <td style="max-width:260px;">{{ tx.description | truncate(55) }}</td>
+        <td>
+          <span class="badge {% if tx.category in ['Meta','TikTok'] %}badge-ready{% elif tx.category == 'Cobro LEVIA' %}badge-live{% elif tx.category == 'Proveedor' %}badge-pending{% else %}badge-ready{% endif %}">
+            {{ tx.category }}
+          </span>
+        </td>
+        <td style="text-align:right;font-weight:600;color:{{ '#065f46' if tx.is_income else '#991b1b' }};">
+          {{ "+" if tx.is_income else "" }}${{ "{:,.0f}".format(tx.amount) }}
+        </td>
+        <td style="text-align:right;font-size:12px;color:var(--ink-soft);">${{ "{:,.0f}".format(tx.balance) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% else %}
+{# ── Empty state ────────────────────────────────────────────────────────── #}
+<div style="text-align:center;padding:60px 20px;color:var(--ink-soft);">
+  <div style="font-size:48px;margin-bottom:16px;">🏦</div>
+  <div style="font-family:'Fraunces',serif;font-size:20px;color:var(--ink);margin-bottom:8px;">Conecta tu cuenta Nu</div>
+  <div style="font-size:14px;max-width:400px;margin:0 auto 24px;line-height:1.6;">
+    Abre la app de Nu → <strong>Estados de cuenta</strong> → selecciona el período → <strong>Exportar CSV</strong> → sube el archivo arriba.
+  </div>
+  <div style="background:var(--bone-soft);border-radius:10px;padding:16px 20px;display:inline-block;text-align:left;font-size:12.5px;line-height:2;">
+    <div>1. Abre Nu México app</div>
+    <div>2. Perfil → Estados de cuenta</div>
+    <div>3. Selecciona mes o rango</div>
+    <div>4. Exportar → CSV</div>
+    <div>5. Sube aquí ↑</div>
+  </div>
+</div>
+{% endif %}
+
+<script>
+function filterTx(dir) {
+  document.querySelectorAll('.tx-row').forEach(el => {
+    el.style.display = (dir === 'all' || el.dataset.dir === dir) ? '' : 'none';
+  });
+  ['all','in','out'].forEach(d => {
+    const btn = document.getElementById('txf-' + d);
+    btn.style.background = d === dir ? 'var(--ink)' : '#fff';
+    btn.style.color = d === dir ? '#fff' : 'var(--ink-soft)';
+  });
+}
+</script>
+{% endblock %}

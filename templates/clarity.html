@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Clarity{% endblock %}
+
+{% block content %}
+<div class="topbar">
+  <div class="topbar-left">
+    <h1 class="serif" style="font-size:22px;margin:0;">👁 Microsoft Clarity</h1>
+    <span style="font-size:12px;color:var(--ink-soft);margin-left:12px;">Heatmaps · Session Recordings · Comportamiento real</span>
+  </div>
+  <div class="topbar-right">
+    <a href="{{ urls.dashboard }}" target="_blank"
+       style="background:var(--accent);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;text-decoration:none;">
+      Abrir Clarity ↗
+    </a>
+  </div>
+</div>
+
+{# Status Banner #}
+<div style="background:{% if status_color == 'green' %}#d1fae5{% else %}#fef9c3{% endif %};
+            border:1px solid {% if status_color == 'green' %}#6ee7b7{% else %}#fde68a{% endif %};
+            border-radius:10px;padding:14px 20px;margin-bottom:24px;display:flex;align-items:center;gap:12px;">
+  <span style="font-size:20px;">{% if status_color == 'green' %}✅{% else %}⏳{% endif %}</span>
+  <div>
+    <div style="font-weight:600;font-size:14px;color:var(--ink);">{{ status_label }}</div>
+    <div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">
+      Snippet instalado el {{ install_date }} · Project ID: <code style="background:rgba(0,0,0,.06);padding:2px 6px;border-radius:4px;">{{ project_id }}</code>
+    </div>
+  </div>
+</div>
+
+{# Quick Links #}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-bottom:32px;">
+
+  <a href="{{ urls.dashboard }}" target="_blank" class="clarity-card">
+    <div class="clarity-card-icon">📊</div>
+    <div class="clarity-card-title">Panel general</div>
+    <div class="clarity-card-desc">Sesiones, usuarios únicos, profundidad de scroll, páginas por sesión</div>
+    <div class="clarity-card-arrow">→</div>
+  </a>
+
+  <a href="{{ urls.recordings }}" target="_blank" class="clarity-card">
+    <div class="clarity-card-icon">🎬</div>
+    <div class="clarity-card-title">Grabaciones</div>
+    <div class="clarity-card-desc">Reproducir sesiones reales — ve exactamente qué hacen los usuarios en la PDP</div>
+    <div class="clarity-card-arrow">→</div>
+  </a>
+
+  <a href="{{ urls.heatmaps }}" target="_blank" class="clarity-card">
+    <div class="clarity-card-icon">🔥</div>
+    <div class="clarity-card-title">Mapas Térmicos</div>
+    <div class="clarity-card-desc">Click maps, scroll depth y attention maps por página</div>
+    <div class="clarity-card-arrow">→</div>
+  </a>
+
+</div>
+
+{# What to look for #}
+<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:24px;">
+  <h2 class="serif" style="font-size:17px;margin:0 0 16px 0;">Qué buscar — Checklist PDP (Nacho Leo + Vic Ecomillions)</h2>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+    <div>
+      <div style="font-weight:600;font-size:13px;color:var(--accent);margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em;">🎬 En Grabaciones</div>
+      <ul style="font-size:13px;color:var(--ink-soft);line-height:1.9;padding-left:16px;margin:0;">
+        <li>¿Hacen scroll hasta el bundle/precio?</li>
+        <li>¿Interactúan con el selector de bundles?</li>
+        <li>¿Abandonan antes del CTA principal?</li>
+        <li>¿Tocan el área de garantía?</li>
+        <li>¿Se quedan en reviews o las saltean?</li>
+        <li>¿Hay rage clicks en alguna zona?</li>
+      </ul>
+    </div>
+    <div>
+      <div style="font-weight:600;font-size:13px;color:#ef4444;margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em;">🔥 En Heatmaps</div>
+      <ul style="font-size:13px;color:var(--ink-soft);line-height:1.9;padding-left:16px;margin:0;">
+        <li>¿Dónde se concentran los clicks en mobile?</li>
+        <li>¿Llegan al 50% del scroll?</li>
+        <li>¿El botón ATC tiene alta concentración?</li>
+        <li>¿Qué imágenes del carrusel ven más?</li>
+        <li>¿Dead clicks cerca del CTA?</li>
+        <li>Scroll depth: ¿supera el 70%?</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+{# Metrics to track #}
+<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:24px;">
+  <h2 class="serif" style="font-size:17px;margin:0 0 16px 0;">Métricas clave — Semáforo Clarity</h2>
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead>
+        <tr style="border-bottom:2px solid var(--border);">
+          <th style="text-align:left;padding:8px 12px;color:var(--ink-soft);font-weight:600;">Métrica</th>
+          <th style="text-align:center;padding:8px 12px;color:#22c55e;font-weight:600;">Verde</th>
+          <th style="text-align:center;padding:8px 12px;color:#eab308;font-weight:600;">Amarillo</th>
+          <th style="text-align:center;padding:8px 12px;color:#ef4444;font-weight:600;">Rojo</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:10px 12px;font-weight:500;">Scroll Depth</td>
+          <td style="text-align:center;padding:10px 12px;">≥ 70%</td>
+          <td style="text-align:center;padding:10px 12px;">50–70%</td>
+          <td style="text-align:center;padding:10px 12px;">< 50%</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:10px 12px;font-weight:500;">Rage Clicks</td>
+          <td style="text-align:center;padding:10px 12px;">< 0.5%</td>
+          <td style="text-align:center;padding:10px 12px;">0.5–2%</td>
+          <td style="text-align:center;padding:10px 12px;">> 2%</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:10px 12px;font-weight:500;">Dead Clicks</td>
+          <td style="text-align:center;padding:10px 12px;">< 5%</td>
+          <td style="text-align:center;padding:10px 12px;">5–15%</td>
+          <td style="text-align:center;padding:10px 12px;">> 15%</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:10px 12px;font-weight:500;">Pages / Sesión</td>
+          <td style="text-align:center;padding:10px 12px;">≥ 2.5</td>
+          <td style="text-align:center;padding:10px 12px;">1.5–2.5</td>
+          <td style="text-align:center;padding:10px 12px;">< 1.5</td>
+        </tr>
+        <tr>
+          <td style="padding:10px 12px;font-weight:500;">Quick Backs (rebote)</td>
+          <td style="text-align:center;padding:10px 12px;">< 0.1%</td>
+          <td style="text-align:center;padding:10px 12px;">0.1–1%</td>
+          <td style="text-align:center;padding:10px 12px;">> 1%</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<style>
+.clarity-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  text-decoration: none;
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: all .15s ease;
+  position: relative;
+}
+.clarity-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 16px rgba(107,143,181,.15);
+  transform: translateY(-2px);
+}
+.clarity-card-icon { font-size: 24px; }
+.clarity-card-title { font-weight: 600; font-size: 14px; }
+.clarity-card-desc { font-size: 12px; color: var(--ink-soft); line-height: 1.5; flex: 1; }
+.clarity-card-arrow {
+  position: absolute; top: 18px; right: 18px;
+  font-size: 16px; color: var(--accent); opacity: 0;
+  transition: opacity .15s;
+}
+.clarity-card:hover .clarity-card-arrow { opacity: 1; }
+</style>
+{% endblock %}

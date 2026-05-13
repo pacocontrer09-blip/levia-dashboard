@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+
+{% block title %}Overview{% endblock %}
+{% block page_title %}Overview{% endblock %}
+{% block page_sub %}Centro de control LEVIA™ · {{ now }}{% endblock %}
+{% block topbar_right %}
+  <span style="background:#d1fae5;color:#065f46;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:600;">● LIVE</span>
+  <span style="margin-left:10px;font-size:11px;color:var(--ink-soft);">⟳ {{ fetched_at }} · {{ kpis_date }}
+    {% if meta_source == 'live' %}<span style="color:#065f46;margin-left:6px;">● Meta live</span>{% endif %}
+  </span>
+{% endblock %}
+
+{% block content %}
+
+{# ── No data banner ──────────────────────────────────────────────────────── #}
+{% if not has_data %}
+<div style="background:#eff6ff;border-left:3px solid var(--accent);padding:12px 16px;border-radius:8px;font-size:13px;color:#1e40af;margin-bottom:20px;">
+  Sin ventas registradas aún — el dashboard se actualizará en tiempo real cuando lleguen las primeras órdenes.
+</div>
+{% endif %}
+
+{# ── Alerts ─────────────────────────────────────────────────────────────── #}
+{% if roas > 0 and roas < 0.8 %}
+<div class="alert red" style="margin-bottom:12px;">⚠ ROAS {{ "%.2f"|format(roas) }}x por debajo del target mínimo (0.8x) — revisar campañas</div>
+{% endif %}
+{% if meta_cpa_mxn > 340 %}
+<div class="alert yellow" style="margin-bottom:12px;">⚠ CPA ${{ "%.0f"|format(meta_cpa_mxn) }} MXN supera límite de $340</div>
+{% endif %}
+
+{# ── Stats grid ──────────────────────────────────────────────────────────── #}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-bottom:24px;">
+
+  {# ROAS #}
+  <div class="card card-sm">
+    <div class="stat-label">ROAS Global</div>
+    <div class="stat-value">{{ "%.2f"|format(roas) }}x</div>
+    <div class="stat-sub" style="margin-top:5px;">
+      {% if roas > 0 %}
+      <span class="pill {{ roas_color }}">{{ "≥1.2 ✓" if roas >= 1.2 else ("cerca" if roas >= 0.8 else "bajo target") }}</span>
+      {% if roas_delta is not none %}
+      <span style="margin-left:5px;font-weight:700;font-size:11px;color:{% if roas_delta >= 0 %}#065f46{% else %}#991b1b{% endif %};">
+        {{ '↑' if roas_delta >= 0 else '↓' }}{{ roas_delta | abs }}%
+      </span>
+      {% endif %}
+      {% else %}<span style="color:var(--ink-soft);font-size:11px;">sin campañas</span>{% endif %}
+    </div>
+  </div>
+
+  {# MER (Marketing Efficiency Ratio) #}
+  <div class="card card-sm">
+    <div class="stat-label" title="Revenue Shopify real / Gasto Meta — sin sobreestimación de atribución">MER Real</div>
+    <div class="stat-value">{{ "%.2f"|format(mer) }}x</div>
+    <div class="stat-sub" style="margin-top:5px;">
+      {% if mer > 0 %}
+      <span class="pill {{ mer_color }}">target ≥2.5x</span>
+      {% else %}<span style="color:var(--ink-soft);font-size:11px;">sin datos</span>{% endif %}
+    </div>
+  </div>
+
+  {# Revenue 90d + WoW arrow #}
+  <div class="card card-sm">
+    <div class="stat-label">Revenue 90d</div>
+    <div class="stat-value">${{ "{:,.0f}".format(total_revenue_mxn) }}</div>
+    <div class="stat-sub" style="margin-top:5px;">
+      <span style="font-size:11px;color:var(--ink-soft);">Esta semana: ${{ "{:,.0f}".format(this_week_revenue) }}</span>
+      {% if revenue_wow is not none %}
+      <span style="margin-left:5px;font-weight:700;font-size:11px;color:{% if revenue_wow >= 0 %}#065f46{% else %}#991b1b{% endif %};">
+        {{ '↑' if revenue_wow >= 0 else '↓' }}{{ revenue_wow | abs }}% vs sem. ant.
+      </span>
+      {% endif %}
+    </div>
+  </div>
+
+  {# Ad Spend #}
+  <div class="card card-sm">
+    <div class="stat-label">Ad Spend</div>
+    <div class="stat-value">${{ "{:,.0f}".format(total_spend_mxn) }}</div>
+    <div class="stat-sub">MXN · Meta Ads 7d
+      {% if spend_delta is not none %}
+      <span style="margin-left:5px;font-weight:700;font-size:11px;color:{% if spend_delta >= 0 %}#92400e{% else %}#065f46{% endif %};">
+        {{ '↑' if spend_delta >= 0 else '↓' }}{{ spend_delta | abs }}%
+      </span>
+      {% endif %}
+    </div>
+  </div>
+
+  {# Órdenes hoy #}
+  <div class="card card-sm">
+    <div class="stat-label">Órdenes Hoy</div>
+    <div class="stat-value">{{ orders_today }}</div>
+    <div class="stat-sub">
+      {% if orders_wow is not none %}
+      <span style="font-size:11px;font-weight:700;color:{% if orders_wow >= 0 %}#065f46{% else %}#991b1b{% endif %};">
+        {{ '↑' if orders_wow >= 0 else '↓' }}{{ orders_wow | abs }}% vs sem. ant.
+      </span>
+      {% endif %}
+      {% if revenue_today > 0 %}<span style="font-size:11px;color:var(--ink-soft);">${{ "{:,.0f}".format(revenue_today) }} MXN</span>{% endif %}
+    </div>
+  </div>
+
+  {# Clientes #}
+  <div class="card card-sm">
+    <div class="stat-label">Clientes</div>
+    <div class="stat-value">{{ customer_count }}</div>
+    <div class="stat-sub">registrados · <a href="/clientes/" style="color:var(--accent);text-decoration:none;font-size:11px;">ver CRM →</a></div>
+  </div>
+
+  {# CTR Meta #}
+  <div class="card card-sm">
+    <div class="stat-label">CTR Meta</div>
+    <div class="stat-value">{{ "%.2f"|format(meta_ctr) }}%</div>
+    <div class="stat-sub" style="margin-top:5px;">
+      {% if meta_ctr > 0 %}
+      <span class="pill {{ 'green' if meta_ctr >= 1.0 else ('yellow' if meta_ctr >= 0.7 else 'red') }}">target ≥1.0%</span>
+      {% if ctr_delta is not none %}
+      <span style="margin-left:5px;font-weight:700;font-size:11px;color:{% if ctr_delta >= 0 %}#065f46{% else %}#991b1b{% endif %};">
+        {{ '↑' if ctr_delta >= 0 else '↓' }}{{ ctr_delta | abs }}%
+      </span>
+      {% endif %}
+      {% else %}<span style="color:var(--ink-soft);font-size:11px;">sin datos</span>{% endif %}
+    </div>
+  </div>
+
+  {# Alcance Meta #}
+  <div class="card card-sm">
+    <div class="stat-label">Alcance Meta</div>
+    <div class="stat-value">{{ "{:,}".format(total_reach) }}</div>
+    <div class="stat-sub">
+      {% if avg_frequency > 0 %}
+      <span style="font-size:11px;color:var(--ink-soft);">freq. {{ "%.1f"|format(avg_frequency) }}x</span>
+      {% if avg_frequency >= 3.5 %}<span style="color:#991b1b;font-size:11px;margin-left:4px;">⚠ fatiga</span>{% endif %}
+      {% endif %}
+      {% if reach_delta is not none %}
+      <span style="margin-left:5px;font-weight:700;font-size:11px;color:{% if reach_delta >= 0 %}#065f46{% else %}#991b1b{% endif %};">
+        {{ '↑' if reach_delta >= 0 else '↓' }}{{ reach_delta | abs }}%
+      </span>
+      {% endif %}
+    </div>
+  </div>
+
+  {# Carritos #}
+  <div class="card card-sm">
+    <div class="stat-label">Carritos Abandonados</div>
+    <div class="stat-value">{{ abandoned_count }}</div>
+    <div class="stat-sub">
+      {% if revenue_at_risk > 0 %}
+      <span style="color:#92400e;font-size:11px;font-weight:600;">${{ "{:,.0f}".format(revenue_at_risk) }} en riesgo</span>
+      {% else %}<a href="/clientes/" style="color:var(--accent);font-size:11px;text-decoration:none;">Ver clientes →</a>{% endif %}
+    </div>
+  </div>
+
+  {# Sin despachar #}
+  <div class="card card-sm">
+    <div class="stat-label">Sin Despachar</div>
+    <div class="stat-value">{{ unfulfilled_count }}</div>
+    <div class="stat-sub">
+      {% if unfulfilled_revenue > 0 %}
+      <span style="color:#92400e;font-size:11px;">${{ "{:,.0f}".format(unfulfilled_revenue) }} MXN</span>
+      {% else %}<span style="color:#065f46;font-size:11px;">todo despachado</span>{% endif %}
+    </div>
+  </div>
+
+</div>
+
+{# ── Revenue 30 días — gráfica principal ──────────────────────────────────── #}
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:24px;">
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <div class="section-title" style="margin:0;">Revenue — últimos 30 días</div>
+      <a href="/ventas" style="font-size:12px;color:var(--accent);text-decoration:none;">Análisis completo →</a>
+    </div>
+    {% if has_data %}
+    <canvas id="mainRevenueChart" height="110"></canvas>
+    <script>
+    (function() {
+      const labels = {{ chart_labels | tojson }};
+      const revenues = {{ chart_revenue | tojson }};
+      const orders = {{ chart_orders | tojson }};
+      const font = { family: 'Inter, sans-serif', size: 10 };
+      new Chart(document.getElementById('mainRevenueChart'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            { label: 'Revenue MXN', data: revenues, backgroundColor: 'rgba(107,143,181,0.55)', borderColor: '#6B8FB5', borderWidth: 1, borderRadius: 3, yAxisID: 'y' },
+            { type: 'line', label: 'Órdenes', data: orders, borderColor: '#C8A15A', pointRadius: 2, tension: 0.3, yAxisID: 'y1', borderWidth: 1.5 },
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { labels: { font, boxWidth: 10 } } },
+          scales: {
+            x: { grid: { display: false }, ticks: { font, maxTicksLimit: 10 } },
+            y: { grid: { color: '#E8E4D9' }, ticks: { font, callback: v => '$' + v.toLocaleString() } },
+            y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { font } },
+          }
+        }
+      });
+    })();
+    </script>
+    {% else %}
+    <div style="text-align:center;padding:40px;color:var(--ink-soft);font-size:13px;">
+      El gráfico aparecerá aquí cuando lleguen las primeras ventas.
+    </div>
+    {% endif %}
+  </div>
+
+  {# KPIs rápidos + Budget #}
+  <div style="display:flex;flex-direction:column;gap:12px;">
+
+    <div class="card card-sm">
+      <div class="stat-label">AOV</div>
+      <div class="stat-value" style="font-size:22px;">${{ "{:,.0f}".format(aov_mxn) }}</div>
+      <div class="stat-sub">MXN por orden · target $1,899</div>
+    </div>
+
+    <div class="card">
+      <div class="section-title" style="font-size:13px;">Budget Testing</div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <span style="font-size:12px;color:var(--ink-soft);">Usado</span>
+        <span style="font-size:12px;font-weight:600;">${{ "{:,.0f}".format(total_spend_mxn) }} / ${{ "{:,.0f}".format(budget_total) }}</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" style="width:{{ [budget_pct, 100] | min }}%;"></div>
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:var(--ink-soft);">
+        Restante: <strong style="color:var(--ink);">${{ "{:,.0f}".format(budget_remaining) }}</strong>
+        · Fase: <strong>{{ phase | upper }}</strong>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+{# ── Decisiones + Pipeline UGC ────────────────────────────────────────────── #}
+<div style="display:grid;grid-template-columns:1.6fr 1fr;gap:14px;">
+
+  <div class="card">
+    <div class="section-title">Decisiones Recientes del Agente</div>
+    {% if decisions %}
+      {% for d in decisions %}
+      <div style="padding:10px 0;border-bottom:1px solid var(--border);{% if loop.last %}border:none;padding-bottom:0;{% endif %}">
+        <div style="font-size:13px;font-weight:600;color:var(--ink);">{{ d.decision }}</div>
+        <div style="font-size:11.5px;color:var(--ink-soft);margin-top:3px;">{{ d.reason }}</div>
+        <div style="font-size:10.5px;color:var(--accent);margin-top:2px;">{{ d.at[:10] if d.at else '' }}</div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div style="color:var(--ink-soft);font-size:13px;">Sin decisiones aún.</div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="section-title">Pipeline UGC</div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px;">
+      <div>
+        <div class="stat-label">Semana activa</div>
+        <div style="font-size:14px;font-weight:600;margin-top:2px;">{{ current_week }}</div>
+      </div>
+      <div>
+        <div class="stat-label">Clips pendientes</div>
+        <div style="font-size:14px;font-weight:600;margin-top:2px;{% if pending_ugc > 0 %}color:#92400e;{% else %}color:#065f46;{% endif %}">
+          {{ pending_ugc }} guiones
+        </div>
+      </div>
+      <a href="/ugc/" style="display:inline-block;background:var(--ink);color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;margin-top:4px;width:fit-content;">Ver Pipeline →</a>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}

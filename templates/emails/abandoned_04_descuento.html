@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="x-apple-disable-message-reformatting">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>Un 10% más, por si es el empujón — LEVIA™</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500&family=Inter:wght@400;500;600&display=swap');
+  body { margin:0; padding:0; background:#F3EFE6; }
+  a { text-decoration:none; }
+  @media only screen and (max-width:620px) {
+    .container { width:100% !important; }
+    .px-40 { padding-left:24px !important; padding-right:24px !important; }
+    .h1 { font-size:32px !important; line-height:1.15 !important; }
+  }
+  :root, [data-ogsc] { color-scheme: light; }
+  @media (prefers-color-scheme: dark) {
+    body { background:#F3EFE6 !important; color:#0A1F3D !important; }
+    table, td { background:#FAF8F3 !important; color:#0A1F3D !important; }
+    a { color:#0A1F3D !important; }
+  }
+</style>
+</head>
+<body style="margin:0;padding:0;background:#F3EFE6;font-family:'Inter',-apple-system,sans-serif;">
+
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+  Código VUELVE10 &mdash; un 10% extra válido 48h. Por si es lo que faltaba.
+</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F3EFE6;">
+  <tr><td align="center" style="padding:40px 16px;">
+    <table role="presentation" class="container" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;margin:0 auto;background:#FAF8F3;border:1px solid #E8E4D9;">
+
+      <tr><td align="center" style="padding:32px 40px 24px 40px;border-bottom:1px solid #E8E4D9;">
+        <a href="https://levia.care" style="font-family:'Fraunces',Georgia,serif;font-size:22px;font-weight:400;letter-spacing:0.18em;color:#0A1F3D;">LEVIA&trade;</a>
+      </td></tr>
+
+      <tr><td class="px-40" style="padding:64px 40px 32px 40px;">
+        <p style="margin:0 0 16px 0;font-family:'Inter',sans-serif;font-size:11px;font-weight:500;letter-spacing:0.22em;text-transform:uppercase;color:#8FA89A;">SOLO POR 48 HORAS</p>
+        <h1 class="h1" style="margin:0 0 20px 0;font-family:'Fraunces',Georgia,serif;font-size:38px;font-weight:400;line-height:1.1;color:#0A1F3D;letter-spacing:-0.01em;">
+          Un 10% más,<br><em style="font-style:italic;color:#4A5B76;">por si era el empujón.</em>
+        </h1>
+        <p style="margin:0;font-family:'Inter',sans-serif;font-size:16px;line-height:1.65;color:#4A5B76;">
+          No lo mandamos a todos. Te lo mandamos a vos porque llegaste hasta el carrito &mdash; algo te hizo dudar. Si es el precio, esto lo corrige.
+        </p>
+      </td></tr>
+
+      <tr><td class="px-40" style="padding:0 40px 40px 40px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F3EFE6;border:1px solid #E8E4D9;">
+          <tr><td align="center" style="padding:32px 24px;">
+            <p style="margin:0 0 8px 0;font-family:'Inter',sans-serif;font-size:11px;font-weight:500;letter-spacing:0.22em;text-transform:uppercase;color:#6B8FB5;">CÓDIGO &middot; USO ÚNICO &middot; 48H</p>
+            <p style="margin:0 0 8px 0;font-family:'Fraunces',Georgia,serif;font-size:30px;font-weight:500;color:#0A1F3D;letter-spacing:0.14em;">VUELVE10</p>
+            <p style="margin:0;font-family:'Inter',sans-serif;font-size:13px;color:#4A5B76;">10% extra sobre tu carrito actual</p>
+          </td></tr>
+        </table>
+      </td></tr>
+
+      <tr><td align="center" style="padding:16px 40px 64px 40px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td style="border-radius:9999px;background:#C8A15A;">
+          <a href="{{ checkout_url|default("https://levia.care/cart") }}?discount=VUELVE10" style="display:inline-block;padding:16px 40px;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#FAF8F3;border-radius:9999px;">Usar VUELVE10 ahora</a>
+        </td></tr></table>
+        <p style="margin:20px 0 0 0;font-family:'Inter',sans-serif;font-size:12px;color:#6B8FB5;">30 noches de garantía &middot; Si no cambia tu mañana, lo devolvés</p>
+      </td></tr>
+
+      <tr><td style="padding:32px 40px;background:#0A1F3D;" align="center">
+        <p style="margin:0 0 12px 0;font-family:'Fraunces',Georgia,serif;font-size:14px;letter-spacing:0.16em;color:#FAF8F3;">LEVIA&trade;</p>
+        <p style="margin:0;font-family:'Inter',sans-serif;font-size:10px;line-height:1.6;color:#6B8FB5;">
+          <a href="{{ unsubscribe_url }}" style="color:#C8A15A;">Darme de baja</a> &middot; <a href="{{ unsubscribe_url }}" style="color:#C8A15A;">Preferencias</a>
+        </p>
+      </td></tr>
+
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>

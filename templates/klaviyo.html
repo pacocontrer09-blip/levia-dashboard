@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Caja — Posición de efectivo{% endblock %}
+{% block page_title %}Caja{% endblock %}
+{% block page_sub %}Posición de efectivo · {{ fetched_at }}{% endblock %}
+{% block topbar_right %}
+  {% if any_missing %}
+  <span style="font-size:11px;color:#92400e;">⚠ Fuentes incompletas · {{ fetched_at }}</span>
+  {% else %}
+  <span style="font-size:11px;color:#065f46;">● Todo conectado · {{ fetched_at }}</span>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+
+{# ── Total de caja ────────────────────────────────────────────────────────── #}
+<div class="card" style="margin-bottom:24px;text-align:center;padding:32px 24px;">
+  <div style="font-size:12px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">Total en caja</div>
+  <div style="font-size:48px;font-weight:700;font-family:var(--font-serif, serif);letter-spacing:-.02em;color:var(--ink);">
+    ${{ "{:,.0f}".format(total) }}
+    <span style="font-size:20px;font-weight:400;color:var(--ink-soft);">MXN</span>
+  </div>
+  {% if any_missing %}
+  <div style="margin-top:10px;font-size:12px;color:#92400e;">* Algunas fuentes sin conectar — el total es parcial</div>
+  {% endif %}
+</div>
+
+{# ── Tarjetas por fuente ──────────────────────────────────────────────────── #}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-bottom:28px;">
+
+  {% for src in sources %}
+  {% set d = src.data %}
+  {% set has_balance = d.balance is not none %}
+  <div class="card" style="position:relative;">
+
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+      <span style="font-size:20px;">{{ src.icon }}</span>
+      <div>
+        <div style="font-weight:600;font-size:14px;">{{ src.name }}</div>
+        <div style="font-size:11px;color:var(--ink-soft);">
+          {% if d.source == 'live' %}● En tiempo real
+          {% elif d.source == 'csv_cache' %}⟳ Desde último CSV
+          {% elif d.source == 'no_token' %}⚠ Sin token configurado
+          {% elif d.source == 'no_data' %}⚠ Sin datos — sube un CSV
+          {% elif d.source == 'not_available' %}— No disponible en MX
+          {% else %}⚠ Error de conexión
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {% if has_balance %}
+    <div style="font-size:32px;font-weight:700;color:var(--ink);">
+      ${{ "{:,.2f}".format(d.balance) }}
+      <span style="font-size:13px;font-weight:400;color:var(--ink-soft);">{{ d.currency or 'MXN' }}</span>
+    </div>
+    {% if d.updated_at %}
+    <div style="font-size:11px;color:var(--ink-soft);margin-top:6px;">Actualizado: {{ d.updated_at }}</div>
+    {% endif %}
+
+    {% else %}
+    <div style="padding:20px 0;color:var(--ink-soft);font-size:13px;">
+      {% if d.source == 'no_token' %}
+        {% if src.name == 'MercadoPago' %}
+        Agrega <code>MP_ACCESS_TOKEN=...</code> en <code>.env</code>
+        {% else %}
+        Token no configurado
+        {% endif %}
+      {% elif d.source == 'no_data' %}
+        Ve a <strong>Banco Nu</strong> y sube tu CSV de estado de cuenta
+      {% elif d.source == 'not_available' %}
+        Shopify Payments no está disponible en México — usa MercadoPago
+      {% else %}
+        Error: {{ d.get('error', '—') }}
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if src.manual %}
+    <a href="/bank/" style="display:inline-block;margin-top:12px;font-size:11px;color:var(--accent);text-decoration:none;">
+      → Actualizar CSV
+    </a>
+    {% endif %}
+
+  </div>
+  {% endfor %}
+
+</div>
+
+{# ── Guía de configuración ────────────────────────────────────────────────── #}
+{% if any_missing %}
+<div class="card">
+  <div class="section-title">Cómo conectar las fuentes faltantes</div>
+  <div style="display:grid;gap:14px;margin-top:12px;">
+
+    <div style="display:flex;gap:12px;align-items:flex-start;">
+      <span style="font-size:18px;">🟣</span>
+      <div>
+        <div style="font-weight:600;font-size:13px;">Nu México</div>
+        <div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">Nu no tiene API pública. Ve a la app → <strong>Inicio → Estado de cuenta → Exportar CSV</strong> → sube en <a href="/bank/" style="color:var(--accent);">Banco Nu</a>. El saldo se actualiza automáticamente.</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:12px;align-items:flex-start;">
+      <span style="font-size:18px;">🔵</span>
+      <div>
+        <div style="font-weight:600;font-size:13px;">MercadoPago</div>
+        <div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">
+          1. Ve a <strong>developers.mercadopago.com</strong> → Tus integraciones → tu app → Credenciales de producción<br>
+          2. Copia el <strong>Access Token</strong> de producción (empieza con <code>APP_USR-</code>)<br>
+          3. Agrega en <code>.env</code>: <code>MP_ACCESS_TOKEN=APP_USR-...</code><br>
+          4. Reinicia el dashboard
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,33 @@
+{# htmx partial — replaces #stats-grid inner content #}
+
+<div class="card card-sm">
+  <div class="stat-label">ROAS Global</div>
+  <div class="stat-value">{{ "%.2f"|format(roas) }}x</div>
+  <div class="stat-sub" style="margin-top:8px;">
+    {% if roas > 0 %}
+    <span class="pill {{ roas_color }}">{{ "≥1.2 ✓" if roas >= 1.2 else ("0.8–1.2" if roas >= 0.8 else "bajo target") }}</span>
+    {% else %}
+    <span style="color:var(--ink-soft);font-size:11px;">sin campañas</span>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card card-sm">
+  <div class="stat-label">Revenue Total</div>
+  <div class="stat-value">${{ "{:,.0f}".format(total_revenue_mxn) }}</div>
+  <div class="stat-sub">MXN · {{ hist_orders }} órdenes</div>
+</div>
+
+<div class="card card-sm">
+  <div class="stat-label">Ad Spend</div>
+  <div class="stat-value">${{ "{:,.0f}".format(total_spend_mxn) }}</div>
+  <div class="stat-sub">MXN · Meta Ads</div>
+</div>
+
+<div class="card card-sm">
+  <div class="stat-label">Órdenes Hoy</div>
+  <div class="stat-value">{{ orders_today }}</div>
+  <div class="stat-sub">
+    {% if revenue_today > 0 %}${{ "{:,.0f}".format(revenue_today) }} MXN{% else %}esperando ventas{% endif %}
+  </div>
+</div>

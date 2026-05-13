@@ -1,0 +1,692 @@
+{% extends "base.html" %}
+
+{% block title %}SAT / RESICO{% endblock %}
+
+{% block page_title %}SAT · RESICO{% endblock %}
+{% block page_sub %}Obligaciones fiscales · CFDI Global Diaria · Declaraciones{% endblock %}
+
+{% block topbar_right %}
+  {% if modo_live %}
+    <span class="pill green">Producción</span>
+  {% else %}
+    <span class="pill yellow">Sandbox · sin RFC aún</span>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+
+<!-- Alerta: declaración próxima -->
+{% if kpis.alerta_decl %}
+<div class="alert red" style="margin-bottom:16px;">
+  ⚠️ Declaración provisional vence el <strong>{{ kpis.proxima_decl }}</strong> — faltan {{ kpis.dias_para_decl }} días. Presenta en <a href="https://sat.gob.mx" target="_blank" style="color:inherit;text-decoration:underline;">Mi Portal SAT</a>.
+</div>
+{% endif %}
+
+<!-- Alerta: límite RESICO -->
+{% if kpis.alerta_limite %}
+<div class="alert yellow" style="margin-bottom:16px;">
+  ⚠️ Llevas el <strong>{{ kpis.pct_limite_resico }}%</strong> del límite anual de $3.5M MXN en RESICO. Consulta con tu contador si vas a rebasar el tope.
+</div>
+{% endif %}
+
+<!-- Alerta: API no configurada -->
+{% if not api_configurada %}
+<div class="alert yellow" style="margin-bottom:16px;">
+  FACTURAPI_API_KEY no configurada — los CFDIs se calcularán pero no se timbrarán.
+  <a href="https://facturapi.io" target="_blank" style="color:inherit;text-decoration:underline;">Crear cuenta en Facturapi →</a>
+</div>
+{% endif %}
+
+<!-- KPIs del año -->
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-bottom:24px;">
+
+  <div class="card card-sm">
+    <div class="stat-label">Ingresos año {{ year }}</div>
+    <div class="stat-value">${{ "{:,.0f}".format(kpis.ingresos_año) }}</div>
+    <div class="stat-sub">MXN acumulado</div>
+  </div>
+
+  <div class="card card-sm">
+    <div class="stat-label">ISR estimado año</div>
+    <div class="stat-value">${{ "{:,.0f}".format(kpis.isr_estimado_año) }}</div>
+    <div class="stat-sub">Tasa RESICO progresiva</div>
+  </div>
+
+  <div class="card card-sm">
+    <div class="stat-label">ISR mes actual</div>
+    <div class="stat-value">${{ "{:,.0f}".format(kpis.isr_mes) }}</div>
+    <div class="stat-sub">Pagar antes del {{ kpis.proxima_decl }}</div>
+  </div>
+
+  <div class="card card-sm">
+    <div class="stat-label">IVA estimado mes</div>
+    <div class="stat-value">${{ "{:,.0f}".format(kpis.iva_mes) }}</div>
+    <div class="stat-sub">IVA implícito en ventas</div>
+  </div>
+
+  <div class="card card-sm">
+    <div class="stat-label">CFDIs emitidos mes</div>
+    <div class="stat-value">{{ kpis.cfdi_mes }}</div>
+    <div class="stat-sub">{{ kpis.cfdi_año }} en el año</div>
+  </div>
+
+  <div class="card card-sm">
+    <div class="stat-label">Próxima declaración</div>
+    <div class="stat-value" style="font-size:18px;">{{ kpis.proxima_decl }}</div>
+    <div class="stat-sub"
+      {% if kpis.dias_para_decl <= 5 %}style="color:#991b1b;font-weight:600;"{% endif %}>
+      Faltan {{ kpis.dias_para_decl }} días
+    </div>
+  </div>
+
+</div>
+
+<!-- Límite RESICO (barra) -->
+<div class="card" style="margin-bottom:24px;">
+  <div class="section-title">Límite RESICO anual — $3,500,000 MXN</div>
+  <div style="display:flex;align-items:center;gap:16px;">
+    <div class="progress-track" style="flex:1;height:10px;">
+      <div class="progress-fill" style="
+        width:{{ [kpis.pct_limite_resico, 100]|min }}%;
+        background:{% if kpis.pct_limite_resico >= 90 %}#f87171{% elif kpis.pct_limite_resico >= 70 %}#fbbf24{% else %}var(--cta){% endif %};
+      "></div>
+    </div>
+    <span style="font-size:13px;font-weight:600;min-width:50px;">{{ kpis.pct_limite_resico }}%</span>
+  </div>
+  <div style="font-size:12px;color:var(--ink-soft);margin-top:8px;">
+    ${{ "{:,.0f}".format(kpis.ingresos_año) }} de $3,500,000 MXN
+    · Queda ${{ "{:,.0f}".format([3500000 - kpis.ingresos_año, 0]|max) }} MXN de margen
+  </div>
+</div>
+
+<!-- CFDI Global: generar -->
+<div class="card" style="margin-bottom:24px;">
+  <div class="section-title">Generar CFDI Global Diaria</div>
+  <p style="font-size:13px;color:var(--ink-soft);margin:0 0 16px;">
+    Una factura por día que agrupa todas las ventas. RFC receptor: XAXX010101000 (Público en general).
+  </p>
+
+  <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+    <div>
+      <label style="font-size:11px;color:var(--ink-soft);display:block;margin-bottom:4px;">Fecha</label>
+      <input type="date" id="cfdi-date"
+        value="{{ (now() - timedelta(days=1)).strftime('%Y-%m-%d') if now else '' }}"
+        style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;background:#fff;color:var(--ink);"
+      />
+    </div>
+    <button onclick="generarCFDI()"
+      style="background:var(--cta);color:#fff;border:none;padding:9px 20px;border-radius:999px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">
+      Timbrar CFDI
+    </button>
+    <button onclick="generarCFDIAyer()"
+      style="background:var(--ink);color:#fff;border:none;padding:9px 20px;border-radius:999px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">
+      CFDI de ayer
+    </button>
+  </div>
+
+  <div id="cfdi-result" style="margin-top:14px;display:none;">
+    <div id="cfdi-msg" style="font-size:13px;padding:10px 14px;border-radius:8px;"></div>
+  </div>
+</div>
+
+<!-- Simulador de Testeo -->
+<div class="card" style="margin-bottom:24px;">
+  <div class="section-title" style="margin-bottom:4px;">Simulador Completo de Rentabilidad</div>
+  <p style="font-size:12px;color:var(--ink-soft);margin:0 0 20px;">
+    Todos los gastos reales de un e-commerce — plataformas, fulfillment, SAT, tu margen personal — para saber el precio y ROAS mínimos que necesitas.
+  </p>
+
+  <!-- Fila 1: Inputs de producto y ads -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px;margin-bottom:20px;">
+
+    <div>
+      <label style="font-size:11px;color:var(--ink-soft);font-weight:600;text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:6px;">Presupuesto Ads</label>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-size:13px;color:var(--ink-soft);">$</span>
+        <input type="number" id="sim-budget" value="5000" min="500" step="500" oninput="simCalc()"
+          style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;font-weight:600;width:100%;font-family:inherit;color:var(--ink);">
+        <span style="font-size:11px;color:var(--ink-soft);">MXN</span>
+      </div>
+    </div>
+
+    <div>
+      <label style="font-size:11px;color:var(--ink-soft);font-weight:600;text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:6px;">Precio de Venta</label>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-size:13px;color:var(--ink-soft);">$</span>
+        <input type="number" id="sim-price" value="1299" min="800" step="50" oninput="simCalc()"
+          style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;font-weight:600;width:100%;font-family:inherit;color:var(--ink);">
+        <span style="font-size:11px;color:var(--ink-soft);">MXN</span>
+      </div>
+    </div>
+
+    <div>
+      <label style="font-size:11px;color:var(--ink-soft);font-weight:600;text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:6px;">COGS por unidad</label>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-size:13px;color:var(--ink-soft);">$</span>
+        <input type="number" id="sim-cogs" value="450" min="100" step="10" oninput="simCalc()"
+          style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;font-weight:600;width:100%;font-family:inherit;color:var(--ink);">
+        <span style="font-size:11px;color:var(--ink-soft);">MXN</span>
+      </div>
+    </div>
+
+    <div>
+      <label style="font-size:11px;color:var(--ink-soft);font-weight:600;text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:6px;">COGS Funda (bonus)</label>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-size:13px;color:var(--ink-soft);">$</span>
+        <input type="number" id="sim-funda" value="225" min="0" step="5" oninput="simCalc()"
+          style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;font-weight:600;width:100%;font-family:inherit;color:var(--ink);">
+        <span style="font-size:11px;color:var(--ink-soft);">MXN</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Fila 2: Fulfillment toggle -->
+  <div style="background:var(--bone-soft);border-radius:10px;padding:14px 16px;margin-bottom:16px;">
+    <div style="font-size:11px;color:var(--ink-soft);font-weight:600;text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;">Fulfillment / Envío</div>
+    <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500;">
+        <input type="radio" name="sim-fulfillment" value="propio" checked onchange="simFulfillmentChange()" style="accent-color:var(--accent);">
+        Envío propio
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500;">
+        <input type="radio" name="sim-fulfillment" value="conexion" onchange="simFulfillmentChange()" style="accent-color:var(--accent);">
+        Conexión Drop <span style="font-size:11px;color:var(--ink-soft);">(envío incluido en COGS — $0 extra)</span>
+      </label>
+      <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
+        <span style="font-size:13px;color:var(--ink-soft);">$</span>
+        <input type="number" id="sim-envio" value="80" min="0" step="5" oninput="simCalc()"
+          style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:14px;font-weight:600;width:90px;font-family:inherit;color:var(--ink);">
+        <span style="font-size:11px;color:var(--ink-soft);">MXN/unidad</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fila 3: Costos de plataformas (checkboxes) -->
+  <div style="background:var(--bone-soft);border-radius:10px;padding:14px 16px;margin-bottom:16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="font-size:11px;color:var(--ink-soft);font-weight:600;text-transform:uppercase;letter-spacing:.07em;">Costos de Plataformas / mes</div>
+      <div style="font-size:13px;font-weight:700;color:var(--ink);">Total: <span id="sim-fijos-total">$831</span> MXN</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;">
+      <label style="display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;font-size:13px;">
+        <span style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="plat-shopify" checked onchange="simCalc()" style="accent-color:var(--accent);">
+          Shopify Basic
+        </span>
+        <span style="color:var(--ink-soft);font-size:12px;">$432</span>
+      </label>
+      <label style="display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;font-size:13px;">
+        <span style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="plat-facturapi" checked onchange="simCalc()" style="accent-color:var(--accent);">
+          Facturapi (PAC)
+        </span>
+        <span style="color:var(--ink-soft);font-size:12px;">$399</span>
+      </label>
+      <label style="display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;font-size:13px;">
+        <span style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="plat-claude" checked onchange="simCalc()" style="accent-color:var(--accent);">
+          Claude Max
+        </span>
+        <span style="color:var(--ink-soft);font-size:12px;">$1,730</span>
+      </label>
+      <label style="display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;font-size:13px;">
+        <span style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="plat-dominio" checked onchange="simCalc()" style="accent-color:var(--accent);">
+          Dominio
+        </span>
+        <span style="color:var(--ink-soft);font-size:12px;">$13</span>
+      </label>
+      <label style="display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;font-size:13px;">
+        <span style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="plat-higgsfield" onchange="simCalc()" style="accent-color:var(--accent);">
+          Higgsfield AI (videos)
+        </span>
+        <span style="color:var(--ink-soft);font-size:12px;">$519</span>
+      </label>
+      <label style="display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;font-size:13px;">
+        <span style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="plat-arcads" onchange="simCalc()" style="accent-color:var(--accent);">
+          Arcads (UGC ads)
+        </span>
+        <span style="color:var(--ink-soft);font-size:12px;">$1,713</span>
+      </label>
+      <label style="display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;font-size:13px;">
+        <span style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="plat-elevenlabs" onchange="simCalc()" style="accent-color:var(--accent);">
+          ElevenLabs (voz)
+        </span>
+        <span style="color:var(--ink-soft);font-size:12px;">$87</span>
+      </label>
+      <label style="display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;font-size:13px;">
+        <span style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="plat-contador" onchange="simCalc()" style="accent-color:var(--accent);">
+          Contador externo
+        </span>
+        <span style="color:var(--ink-soft);font-size:12px;">$1,500</span>
+      </label>
+      <label style="display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;font-size:13px;">
+        <span style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="plat-internet" onchange="simCalc()" style="accent-color:var(--accent);">
+          Internet / servicios
+        </span>
+        <span style="color:var(--ink-soft);font-size:12px;">$600</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- Fila 4: Margen objetivo -->
+  <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px 16px;margin-bottom:20px;">
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+      <div style="font-size:11px;color:var(--ink-soft);font-weight:600;text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;">Mi margen objetivo</div>
+      <input type="range" id="sim-margin-slider" min="5" max="40" value="20" step="1" oninput="simMarginSync()"
+        style="flex:1;min-width:120px;accent-color:#059669;">
+      <div style="display:flex;align-items:center;gap:4px;">
+        <input type="number" id="sim-margin-pct" value="20" min="5" max="40" step="1" oninput="simMarginSync()"
+          style="border:1px solid #bbf7d0;border-radius:6px;padding:4px 8px;font-size:14px;font-weight:700;width:60px;font-family:inherit;color:#065f46;background:#f0fdf4;">
+        <span style="font-size:13px;color:#065f46;font-weight:600;">%</span>
+      </div>
+      <div id="sim-margin-label" style="font-size:13px;color:#065f46;font-weight:600;white-space:nowrap;">—</div>
+    </div>
+  </div>
+
+  <!-- KPI cards -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:20px;">
+    <div class="card card-sm" style="background:var(--bone-soft);">
+      <div class="stat-label">Gross Margin</div>
+      <div id="sim-gm" class="stat-value" style="font-size:20px;">—</div>
+      <div class="stat-sub">objetivo ≥65%</div>
+    </div>
+    <div class="card card-sm" style="background:var(--bone-soft);">
+      <div class="stat-label">ROAS Breakeven</div>
+      <div id="sim-be" class="stat-value" style="font-size:20px;">—</div>
+      <div class="stat-sub">mínimo para no perder</div>
+    </div>
+    <div class="card card-sm" style="background:#f0fdf4;border:1px solid #bbf7d0;">
+      <div class="stat-label">ROAS para margen obj.</div>
+      <div id="sim-be-margin" class="stat-value" style="font-size:20px;">—</div>
+      <div class="stat-sub" id="sim-be-margin-sub">para 20% dueño</div>
+    </div>
+    <div class="card card-sm" style="background:var(--bone-soft);">
+      <div class="stat-label">Unidades (ROAS 3x)</div>
+      <div id="sim-units" class="stat-value" style="font-size:20px;">—</div>
+      <div class="stat-sub">ventas proyectadas</div>
+    </div>
+    <div class="card card-sm" style="background:var(--bone-soft);">
+      <div class="stat-label">Cash neto (ROAS 3x)</div>
+      <div id="sim-net" class="stat-value" style="font-size:20px;">—</div>
+      <div class="stat-sub">después de todo</div>
+    </div>
+  </div>
+
+  <!-- Tabla de escenarios -->
+  <div style="font-size:11px;color:var(--ink-soft);font-weight:600;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">Escenarios por ROAS</div>
+  <div style="overflow-x:auto;">
+    <table id="sim-table">
+      <thead>
+        <tr>
+          <th>ROAS</th>
+          <th>Revenue</th>
+          <th>Unidades</th>
+          <th>Gross Profit</th>
+          <th>− SAT (ISR+IVA)</th>
+          <th>Cash neto</th>
+          <th>ROI ads</th>
+          <th>Margen dueño</th>
+          <th>Veredicto</th>
+        </tr>
+      </thead>
+      <tbody id="sim-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+(function() {
+  var SHOPIFY_TX   = 0.02;
+  var PAYMENT_PCT  = 0.025;
+  var PAYMENT_FIXED = 10;
+  var ISR_RATE     = 0.019;
+  var CONEXION_DROP_COST = 0; // shipping incluido en COGS ($26 USD all-in)
+
+  var PLATFORM_COSTS = {
+    'plat-shopify':     432,
+    'plat-facturapi':   399,
+    'plat-claude':     1730,
+    'plat-dominio':      13,
+    'plat-higgsfield':  519,
+    'plat-arcads':     1713,
+    'plat-elevenlabs':   87,
+    'plat-contador':   1500,
+    'plat-internet':    600,
+  };
+
+  function getPlatformTotal() {
+    var total = 0;
+    Object.keys(PLATFORM_COSTS).forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el && el.checked) total += PLATFORM_COSTS[id];
+    });
+    return total;
+  }
+
+  function getEnvio() {
+    var radios = document.querySelectorAll('input[name="sim-fulfillment"]');
+    var useConexion = false;
+    radios.forEach(function(r) { if (r.checked && r.value === 'conexion') useConexion = true; });
+    if (useConexion) return CONEXION_DROP_COST;
+    return parseFloat(document.getElementById('sim-envio').value) || 80;
+  }
+
+  function calcScenario(budget, price, cogs, funda, envio, fijos, roas) {
+    var revenue      = budget * roas;
+    var units        = revenue / price;
+    var cogs_total   = units * (cogs + funda);
+    var gross_profit = revenue - cogs_total;
+    var gross_margin = revenue > 0 ? gross_profit / revenue * 100 : 0;
+    var envio_total  = units * envio;
+    var shopify_fee  = revenue * SHOPIFY_TX;
+    var payment_fee  = revenue * PAYMENT_PCT + units * PAYMENT_FIXED;
+    var isr          = revenue * ISR_RATE;
+    var iva_ventas   = revenue / 1.16 * 0.16;
+    var iva_acred    = (budget / 1.16 * 0.16) + (envio_total / 1.16 * 0.16);
+    var iva_neto     = Math.max(0, iva_ventas - iva_acred);
+    var sat_total    = isr + iva_neto;
+    // net = cash real después de TODOS los costos incluyendo el presupuesto de ads
+    var net          = gross_profit - envio_total - fijos - shopify_fee - payment_fee - sat_total - budget;
+    var roi          = budget > 0 ? net / budget * 100 : 0;
+    var owner_margin = revenue > 0 ? net / revenue * 100 : 0;
+    return { revenue: revenue, units: units, gross_profit: gross_profit,
+             gross_margin: gross_margin, sat_total: sat_total, net: net,
+             roi: roi, owner_margin: owner_margin };
+  }
+
+  function findRoasFor(budget, price, cogs, funda, envio, fijos, targetMargin) {
+    for (var r = 1.0; r <= 15.0; r += 0.05) {
+      var s = calcScenario(budget, price, cogs, funda, envio, fijos, r);
+      if (s.owner_margin >= targetMargin) return r;
+    }
+    return null;
+  }
+
+  function findBreakeven(budget, price, cogs, funda, envio, fijos) {
+    return findRoasFor(budget, price, cogs, funda, envio, fijos, 0);
+  }
+
+  function fmt(n) { return '$' + Math.round(n).toLocaleString('es-MX'); }
+  function fmtPct(n) { return n.toFixed(1) + '%'; }
+
+  window.simFulfillmentChange = function() {
+    var radios = document.querySelectorAll('input[name="sim-fulfillment"]');
+    var useConexion = false;
+    radios.forEach(function(r) { if (r.checked && r.value === 'conexion') useConexion = true; });
+    var envioInput = document.getElementById('sim-envio');
+    if (useConexion) {
+      envioInput.value = CONEXION_DROP_COST;
+      envioInput.disabled = true;
+      envioInput.style.opacity = '0.5';
+    } else {
+      envioInput.value = 80;
+      envioInput.disabled = false;
+      envioInput.style.opacity = '1';
+    }
+    simCalc();
+  };
+
+  window.simMarginSync = function() {
+    var slider = document.getElementById('sim-margin-slider');
+    var numInput = document.getElementById('sim-margin-pct');
+    if (document.activeElement === slider) numInput.value = slider.value;
+    else slider.value = numInput.value;
+    simCalc();
+  };
+
+  window.simCalc = function() {
+    var budget = parseFloat(document.getElementById('sim-budget').value) || 5000;
+    var price  = parseFloat(document.getElementById('sim-price').value)  || 1299;
+    var cogs   = parseFloat(document.getElementById('sim-cogs').value)   || 450;
+    var funda  = parseFloat(document.getElementById('sim-funda').value)  || 65;
+    var envio  = getEnvio();
+    var targetMargin = parseFloat(document.getElementById('sim-margin-pct').value) || 20;
+
+    var platTotal = getPlatformTotal();
+    document.getElementById('sim-fijos-total').textContent = fmt(platTotal);
+
+    var fijos = platTotal;
+
+    // Gross margin del producto (sin ads ni fijos)
+    var gm = price > 0 ? (price - cogs - funda) / price * 100 : 0;
+    var gmEl = document.getElementById('sim-gm');
+    gmEl.textContent = fmtPct(gm);
+    gmEl.style.color = gm >= 65 ? '#065f46' : (gm >= 55 ? '#92400e' : '#991b1b');
+
+    var be = findBreakeven(budget, price, cogs, funda, envio, fijos);
+    var beEl = document.getElementById('sim-be');
+    beEl.textContent = be ? be.toFixed(1) + 'x' : '>15x';
+    beEl.style.color = be && be <= 3 ? '#065f46' : (be && be <= 4 ? '#92400e' : '#991b1b');
+
+    var beMargin = findRoasFor(budget, price, cogs, funda, envio, fijos, targetMargin);
+    var beMarginEl = document.getElementById('sim-be-margin');
+    beMarginEl.textContent = beMargin ? beMargin.toFixed(1) + 'x' : '>15x';
+    beMarginEl.style.color = beMargin && beMargin <= 4 ? '#065f46' : (beMargin && beMargin <= 6 ? '#92400e' : '#991b1b');
+    document.getElementById('sim-be-margin-sub').textContent = 'para ' + targetMargin + '% dueño';
+    document.getElementById('sim-margin-label').textContent =
+      beMargin ? 'Necesitas ROAS ' + beMargin.toFixed(1) + 'x' : 'No alcanza a 15x';
+
+    var s3 = calcScenario(budget, price, cogs, funda, envio, fijos, 3.0);
+    document.getElementById('sim-units').textContent = s3.units.toFixed(1);
+    var netEl = document.getElementById('sim-net');
+    netEl.textContent = fmt(s3.net);
+    netEl.style.color = s3.net >= 0 ? '#065f46' : '#991b1b';
+
+    // Tabla
+    var roas_list = [2.0, 2.5, 3.0, 3.5, 4.0, 5.0];
+    var tbody = document.getElementById('sim-tbody');
+    tbody.innerHTML = '';
+    roas_list.forEach(function(roas) {
+      var s = calcScenario(budget, price, cogs, funda, envio, fijos, roas);
+      var isBreakeven = be && Math.abs(roas - be) < 0.15;
+      var isMarginTarget = beMargin && Math.abs(roas - beMargin) < 0.15;
+      var positive = s.net >= 0;
+      var hitsMargin = s.owner_margin >= targetMargin;
+      var ownerColor = hitsMargin ? '#065f46' : (s.owner_margin >= targetMargin * 0.7 ? '#92400e' : '#991b1b');
+      var verdict = hitsMargin
+        ? '<span class="pill green">✓ Margen OK</span>'
+        : (positive ? '<span class="pill yellow">Ganancia</span>' : (s.roi > -20 ? '<span class="pill yellow">Casi</span>' : '<span class="pill red">Pérdida</span>'));
+      var rowBg = isMarginTarget ? 'background:#f0fdf4;' : (isBreakeven ? 'background:#fffbeb;' : '');
+      var tag = isMarginTarget ? ' ←obj' : (isBreakeven ? ' ←BE' : '');
+      tbody.innerHTML +=
+        '<tr style="' + rowBg + '">' +
+        '<td style="font-weight:700;">' + roas.toFixed(1) + 'x' + (tag ? '<span style="font-size:10px;color:var(--ink-soft);">' + tag + '</span>' : '') + '</td>' +
+        '<td>' + fmt(s.revenue) + '</td>' +
+        '<td>' + s.units.toFixed(1) + '</td>' +
+        '<td>' + fmt(s.gross_profit) + ' <span style="font-size:11px;color:var(--ink-soft);">(' + fmtPct(s.gross_margin) + ')</span></td>' +
+        '<td style="color:#991b1b;">−' + fmt(s.sat_total) + '</td>' +
+        '<td style="font-weight:700;color:' + (positive ? '#065f46' : '#991b1b') + ';">' + fmt(s.net) + '</td>' +
+        '<td style="color:' + (positive ? '#065f46' : '#991b1b') + ';">' + fmtPct(s.roi) + '</td>' +
+        '<td style="font-weight:700;color:' + ownerColor + ';">' + fmtPct(s.owner_margin) + '</td>' +
+        '<td>' + verdict + '</td>' +
+        '</tr>';
+    });
+  };
+
+  window.simCalc();
+})();
+</script>
+
+<!-- IVA Acreditable automático -->
+<div class="card" style="margin-bottom:24px;">
+  <div class="section-title" style="margin-bottom:4px;">IVA Acreditable — {{ month }}</div>
+  <p style="font-size:12px;color:var(--ink-soft);margin:0 0 14px;">
+    Calculado automáticamente desde tus transacciones de Nu. El IVA que pagaste a proveedores reduce lo que le debes al SAT.
+  </p>
+
+  {% if iva_data.sin_datos_banco %}
+  <div class="alert yellow">
+    Sin datos del banco Nu. Sube el CSV en <a href="/bank/" style="color:inherit;text-decoration:underline;">Banco Nu →</a> para activar el cálculo automático.
+  </div>
+  {% else %}
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:16px;">
+    <div class="card card-sm" style="background:var(--bone-soft);">
+      <div class="stat-label">Gastos con IVA</div>
+      <div class="stat-value" style="font-size:22px;">${{ "{:,.0f}".format(iva_data.gastos_con_iva) }}</div>
+      <div class="stat-sub">{{ iva_data.txs_count }} transacciones</div>
+    </div>
+    <div class="card card-sm" style="background:var(--bone-soft);">
+      <div class="stat-label">IVA Acreditable</div>
+      <div class="stat-value" style="font-size:22px;color:#065f46;">${{ "{:,.0f}".format(iva_data.iva_acreditable) }}</div>
+      <div class="stat-sub">16% sobre base</div>
+    </div>
+    <div class="card card-sm" style="background:var(--bone-soft);">
+      <div class="stat-label">IVA Ventas (estimado)</div>
+      <div class="stat-value" style="font-size:22px;color:#991b1b;">${{ "{:,.0f}".format(kpis.iva_mes) }}</div>
+      <div class="stat-sub">IVA implícito en ingresos</div>
+    </div>
+    <div class="card card-sm" style="background:var(--bone-soft);">
+      <div class="stat-label">IVA Neto a Pagar</div>
+      <div class="stat-value" style="font-size:22px;">${{ "{:,.0f}".format([kpis.iva_mes - iva_data.iva_acreditable, 0]|max) }}</div>
+      <div class="stat-sub">Lo que debes al SAT</div>
+    </div>
+  </div>
+
+  {% if iva_data.detalle %}
+  <div style="font-size:12px;color:var(--ink-soft);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;">Desglose por categoría</div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;">
+    {% for cat, monto in iva_data.detalle.items() %}
+    <div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;">
+      <span style="color:var(--ink-soft);">{{ cat }}</span>
+      <span style="font-weight:600;margin-left:6px;">${{ "{:,.0f}".format(monto) }}</span>
+      <span style="color:#065f46;margin-left:4px;">(IVA ${{ "{:,.0f}".format(monto / 1.16 * 0.16) }})</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% endif %}
+</div>
+
+<!-- Historial de CFDIs -->
+<div class="card">
+  <div class="section-title" style="margin-bottom:16px;">Historial de CFDIs</div>
+
+  {% if invoices %}
+  <table>
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Órdenes</th>
+        <th>Subtotal</th>
+        <th>IVA</th>
+        <th>Total</th>
+        <th>Folio</th>
+        <th>Status</th>
+        <th>Modo</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for inv in invoices %}
+      <tr>
+        <td>{{ inv.date }}</td>
+        <td>{{ inv.orders_count }}</td>
+        <td>${{ "{:,.2f}".format(inv.subtotal or 0) }}</td>
+        <td>${{ "{:,.2f}".format(inv.tax or 0) }}</td>
+        <td style="font-weight:600;">${{ "{:,.2f}".format(inv.total or 0) }}</td>
+        <td style="font-size:12px;color:var(--ink-soft);">{{ inv.folio or "—" }}</td>
+        <td>
+          {% if inv.status == "valid" %}
+            <span class="pill green">Timbrado</span>
+          {% elif inv.status == "canceled" %}
+            <span class="pill red">Cancelado</span>
+          {% else %}
+            <span class="pill yellow">{{ inv.status }}</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if inv.live %}
+            <span class="badge badge-live">Live</span>
+          {% else %}
+            <span class="badge badge-ready">Sandbox</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="text-align:center;padding:40px 0;color:var(--ink-soft);font-size:14px;">
+    Sin CFDIs generados aún.<br>
+    <span style="font-size:12px;">Cuando tengas RFC y CSD, presiona "Timbrar CFDI" para generar tu primera factura global.</span>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Info: trámites SAT -->
+<div class="card" style="margin-top:16px;background:var(--bone-soft);">
+  <div class="section-title">Trámites previos en el SAT</div>
+  <ol style="font-size:13px;color:var(--ink-soft);line-height:1.9;padding-left:18px;margin:0;">
+    <li><strong style="color:var(--ink);">e.firma (FIEL)</strong> — SAT presencial con cita. Llevar INE + CURP.</li>
+    <li><strong style="color:var(--ink);">RFC + inscripción a RESICO</strong> — en <a href="https://sat.gob.mx" target="_blank">Mi Portal SAT</a> con e.firma.</li>
+    <li><strong style="color:var(--ink);">CSD (Certificado de Sello Digital)</strong> — en línea en el SAT ya con e.firma.</li>
+    <li><strong style="color:var(--ink);">Facturapi</strong> — crear cuenta en <a href="https://facturapi.io" target="_blank">facturapi.io</a>, subir CSD, obtener API Key y agregar a <code>.env</code>.</li>
+    <li>Cambiar <code>FACTURAPI_LIVE=true</code> y <code>SAT_RFC=tu_rfc</code> en <code>.env</code>.</li>
+  </ol>
+</div>
+
+<script>
+  // Inyectar fecha de ayer por defecto
+  (function() {
+    var d = new Date();
+    d.setDate(d.getDate() - 1);
+    var s = d.toISOString().split('T')[0];
+    var el = document.getElementById('cfdi-date');
+    if (el && !el.value) el.value = s;
+  })();
+
+  async function generarCFDI() {
+    var dateVal = document.getElementById('cfdi-date').value;
+    await _timbrar(dateVal);
+  }
+
+  async function generarCFDIAyer() {
+    var d = new Date();
+    d.setDate(d.getDate() - 1);
+    await _timbrar(d.toISOString().split('T')[0]);
+  }
+
+  async function _timbrar(dateStr) {
+    var resultDiv = document.getElementById('cfdi-result');
+    var msgDiv = document.getElementById('cfdi-msg');
+    resultDiv.style.display = 'block';
+    msgDiv.style.background = '#fef3c7';
+    msgDiv.style.color = '#92400e';
+    msgDiv.textContent = 'Generando CFDI para ' + dateStr + '...';
+
+    try {
+      var resp = await fetch('/sat/cfdi/global', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({date: dateStr}),
+      });
+      var data = await resp.json();
+      if (data.ok) {
+        msgDiv.style.background = '#d1fae5';
+        msgDiv.style.color = '#065f46';
+        var inv = data.invoice;
+        msgDiv.innerHTML = '✓ CFDI timbrado — ' + inv.orders_count + ' órdenes · $' +
+          parseFloat(inv.total).toLocaleString('es-MX') + ' MXN · Folio ' + (inv.folio || '—');
+        setTimeout(function() { location.reload(); }, 2000);
+      } else {
+        msgDiv.style.background = '#fee2e2';
+        msgDiv.style.color = '#991b1b';
+        msgDiv.textContent = '✗ Error: ' + (data.error || 'desconocido');
+      }
+    } catch(e) {
+      msgDiv.style.background = '#fee2e2';
+      msgDiv.style.color = '#991b1b';
+      msgDiv.textContent = '✗ Error de red: ' + e.message;
+    }
+  }
+</script>
+
+{% endblock %}

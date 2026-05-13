@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}Pipeline UGC{% endblock %}
+{% block page_title %}Pipeline UGC{% endblock %}
+{% block page_sub %}Semana activa: {{ current_week.name if current_week else '—' }} · {{ total_weeks }} ciclos totales{% endblock %}
+
+{% block content %}
+
+{# ── Stats overview ─────────────────────────────────────────────────────── #}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px;margin-bottom:28px;">
+
+  <div class="card card-sm">
+    <div class="stat-label">Ciclos Generados</div>
+    <div class="stat-value">{{ total_weeks }}</div>
+    <div class="stat-sub">semanas en producción</div>
+  </div>
+
+  <div class="card card-sm">
+    <div class="stat-label">Quota Opal Hoy</div>
+    <div class="stat-value">{{ quota_used }}<span style="font-size:16px;color:var(--ink-soft);">/{{ quota_limit }}</span></div>
+    <div class="stat-sub">
+      <div class="progress-track" style="margin-top:6px;">
+        <div class="progress-fill" style="width:{{ (quota_used / quota_limit * 100) | int }}%;background:{{ '#6B8FB5' if quota_used < quota_limit else '#f87171' }};"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card card-sm">
+    <div class="stat-label">Pendientes Manual</div>
+    <div class="stat-value {% if pending_count > 0 %}text-yellow-600{% endif %}">{{ pending_count }}</div>
+    <div class="stat-sub">guiones sin renderizar</div>
+  </div>
+
+  <div class="card card-sm">
+    <div class="stat-label">Hooks en Librería</div>
+    <div class="stat-value">{{ hooks_count }}</div>
+    <div class="stat-sub">hooks psicológicos</div>
+  </div>
+
+  <div class="card card-sm">
+    <div class="stat-label">Creative Matrix</div>
+    <div class="stat-value">{{ matrix_count }}</div>
+    <div class="stat-sub">combinaciones (4×4×4)</div>
+  </div>
+
+</div>
+
+{# ── Semana activa ───────────────────────────────────────────────────────── #}
+{% if current_week %}
+<div class="card" style="margin-bottom:24px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+    <div class="section-title" style="margin:0;">Semana Activa — {{ current_week.name }}</div>
+    <span class="pill green">{{ current_week.mp4_count }} videos · {{ current_week.size_mb }} MB</span>
+  </div>
+
+  {% if current_week.videos %}
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;">
+    {% for v in current_week.videos %}
+    <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#fff;">
+      <video src="{{ v.url }}" controls preload="metadata"
+             style="width:100%;background:#000;aspect-ratio:9/16;object-fit:cover;max-height:280px;"></video>
+      <div style="padding:10px 12px;">
+        <div style="font-size:12.5px;font-weight:600;color:var(--ink);">{{ v.name }}</div>
+        <div style="margin-top:6px;display:flex;gap:6px;">
+          <a href="{{ v.url }}" download
+             style="font-size:11px;padding:4px 10px;background:var(--ink);color:#fff;border-radius:5px;text-decoration:none;font-weight:600;">
+            ↓ Descargar
+          </a>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div style="color:var(--ink-soft);font-size:13px;">Sin videos en esta carpeta aún.</div>
+  {% endif %}
+</div>
+{% endif %}
+
+{# ── Pendientes manuales ─────────────────────────────────────────────────── #}
+{% if pending %}
+<div class="card" style="margin-bottom:24px;">
+  <div class="section-title">Guiones Pendientes — Acción Manual Requerida</div>
+  <div style="margin-bottom:12px;padding:10px 14px;background:#fef3c7;border-radius:8px;border-left:3px solid #fbbf24;font-size:13px;color:#92400e;">
+    ⚠ Estos guiones fallaron el render automático (Remotion). Deben generarse manualmente con Opal + ElevenLabs y subirse a la carpeta de output.
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Composición</th>
+        <th>Hook</th>
+        <th>Escenas</th>
+        <th>Razón del fallo</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for g in pending %}
+      <tr>
+        <td><code style="font-size:11.5px;background:var(--bone-soft);padding:2px 6px;border-radius:3px;">{{ g.guion_id }}</code></td>
+        <td style="font-weight:500;">{{ g.composition }}</td>
+        <td style="max-width:200px;">
+          {% if g.remotion_props %}
+            <span style="font-size:12px;color:var(--ink);">{{ g.remotion_props.hookText | truncate(50) }}</span>
+          {% endif %}
+        </td>
+        <td style="color:var(--ink-soft);">{{ g.veo3_prompts | length if g.veo3_prompts else '—' }} escenas</td>
+        <td>
+          <span class="badge badge-pending">{{ g.razon_fallo | truncate(40) if g.razon_fallo else 'sin info' }}</span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{# ── Historial de semanas ────────────────────────────────────────────────── #}
+{% if weeks | length > 1 %}
+<div class="card">
+  <div class="section-title">Historial de Ciclos</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Semana / Folder</th>
+        <th>Videos MP4</th>
+        <th>Audios</th>
+        <th>Tamaño</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for w in weeks %}
+      <tr>
+        <td style="font-weight:500;">{{ w.name }}</td>
+        <td>
+          {% if w.mp4_count > 0 %}
+            <span class="badge badge-live">{{ w.mp4_count }} videos</span>
+          {% else %}
+            <span class="badge badge-ready">vacía</span>
+          {% endif %}
+        </td>
+        <td style="color:var(--ink-soft);">{{ w.mp3_count }}</td>
+        <td style="color:var(--ink-soft);">{{ w.size_mb }} MB</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% endblock %}

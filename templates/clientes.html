@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+{% block title %}Clientes{% endblock %}
+{% block page_title %}Clientes{% endblock %}
+{% block page_sub %}CRM · Carritos abandonados · Draft orders · ⟳ {{ fetched_at }}{% endblock %}
+{% block topbar_right %}
+  <span style="background:#d1fae5;color:#065f46;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:600;">● Shopify live</span>
+{% endblock %}
+
+{% block content %}
+
+{# ── Alerta carritos abandonados ────────────────────────────────────────── #}
+{% if abandoned_count > 0 %}
+<div class="alert yellow" style="margin-bottom:20px;">
+  {{ abandoned_count }} carrito(s) abandonado(s) — ${{ "{:,.0f}".format(revenue_at_risk) }} MXN en riesgo.
+  Considera activar el flujo de recuperación en Klaviyo.
+</div>
+{% endif %}
+
+{# ── KPI cards ───────────────────────────────────────────────────────────── #}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-bottom:28px;">
+
+  <div class="card card-sm">
+    <div class="stat-label">Total Clientes</div>
+    <div class="stat-value">{{ customer_count }}</div>
+    <div class="stat-sub">registrados en Shopify</div>
+  </div>
+
+  <div class="card card-sm">
+    <div class="stat-label">Nuevos este Mes</div>
+    <div class="stat-value">{{ new_this_month }}</div>
+    <div class="stat-sub">de los últimos 50 cargados</div>
+  </div>
+
+  <div class="card card-sm">
+    <div class="stat-label">LTV Promedio</div>
+    <div class="stat-value">${{ "{:,.0f}".format(avg_ltv) }}</div>
+    <div class="stat-sub">MXN por cliente</div>
+  </div>
+
+  <div class="card card-sm">
+    <div class="stat-label">% Recurrentes</div>
+    <div class="stat-value">{{ returning_pct }}%</div>
+    <div class="stat-sub">
+      {% if returning_pct > 0 %}
+      <span class="pill {{ 'green' if returning_pct >= 30 else ('yellow' if returning_pct >= 15 else 'red') }}">
+        target ≥30%
+      </span>
+      {% else %}<span style="color:var(--ink-soft);font-size:11px;">sin datos</span>{% endif %}
+    </div>
+  </div>
+
+  <div class="card card-sm">
+    <div class="stat-label">Acepta Marketing</div>
+    <div class="stat-value">{{ accepts_marketing_pct }}%</div>
+    <div class="stat-sub">
+      {% if accepts_marketing_pct > 0 %}
+      <span class="pill {{ 'green' if accepts_marketing_pct >= 60 else 'yellow' }}">de tu base</span>
+      {% else %}<span style="color:var(--ink-soft);font-size:11px;">sin datos</span>{% endif %}
+    </div>
+  </div>
+
+  <div class="card card-sm">
+    <div class="stat-label">Carritos Abandonados</div>
+    <div class="stat-value">{{ abandoned_count }}</div>
+    <div class="stat-sub">
+      {% if revenue_at_risk > 0 %}
+      <span style="color:#92400e;font-weight:600;">${{ "{:,.0f}".format(revenue_at_risk) }} en riesgo</span>
+      {% else %}<span style="color:#065f46;">sin carritos abiertos</span>{% endif %}
+    </div>
+  </div>
+
+</div>
+
+{# ── RFM Segmentación ────────────────────────────────────────────────────── #}
+{% if rfm_counts %}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:24px;">
+
+  <div class="card card-sm" style="border-left:3px solid #065f46;">
+    <div class="stat-label">Champions</div>
+    <div class="stat-value" style="color:#065f46;">{{ rfm_counts.champion }}</div>
+    <div class="stat-sub">compra reciente y frecuente</div>
+  </div>
+
+  <div class="card card-sm" style="border-left:3px solid #6B8FB5;">
+    <div class="stat-label">Leales</div>
+    <div class="stat-value" style="color:#6B8FB5;">{{ rfm_counts.leal }}</div>
+    <div class="stat-sub">recurrentes consistentes</div>
+  </div>
+
+  <div class="card card-sm" style="border-left:3px solid #fbbf24;">
+    <div class="stat-label">En Riesgo</div>
+    <div class="stat-value" style="color:#92400e;">{{ rfm_counts.en_riesgo }}</div>
+    <div class="stat-sub">sin compra reciente</div>
+  </div>
+
+  <div class="card card-sm" style="border-left:3px solid #f87171;">
+    <div class="stat-label">Dormidos</div>
+    <div class="stat-value" style="color:#991b1b;">{{ rfm_counts.dormido }}</div>
+    <div class="stat-sub">1 compra · +60d inactivos</div>
+  </div>
+
+  <div class="card card-sm" style="border-left:3px solid #8FA89A;">
+    <div class="stat-label">Nuevos</div>
+    <div class="stat-value" style="color:#4A5B76;">{{ rfm_counts.nuevo }}</div>
+    <div class="stat-sub">primera compra reciente</div>
+  </div>
+
+  {% if churn_rate > 0 %}
+  <div class="card card-sm">
+    <div class="stat-label">Tasa Churn Est.</div>
+    <div class="stat-value">{{ churn_rate }}%</div>
+    <div class="stat-sub" style="margin-top:5px;">
+      <span class="pill {{ 'red' if churn_rate > 40 else ('yellow' if churn_rate > 20 else 'green') }}">
+        clientes dormidos / total
+      </span>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+{# Tabla: clientes en riesgo #}
+{% if customers_at_risk %}
+<div class="card" style="margin-bottom:24px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+    <div class="section-title" style="margin:0;">Clientes En Riesgo — Acción inmediata</div>
+    <span style="font-size:11px;color:var(--ink-soft);">Activa flow de reactivación en Klaviyo</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Cliente</th>
+        <th>Email</th>
+        <th style="text-align:right;">Órdenes</th>
+        <th style="text-align:right;">LTV</th>
+        <th style="text-align:right;">Días inactivo</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in customers_at_risk %}
+      <tr>
+        <td style="font-weight:600;">{{ c.first_name }} {{ c.last_name }}</td>
+        <td style="color:var(--ink-soft);font-size:12px;">{{ c.email }}</td>
+        <td style="text-align:right;">{{ c.orders_count }}</td>
+        <td style="text-align:right;font-weight:600;color:#065f46;">${{ "{:,.0f}".format(c.total_spent | float) }}</td>
+        <td style="text-align:right;">
+          <span style="font-weight:700;color:{% if c.days_since_order > 60 %}#991b1b{% else %}#92400e{% endif %};">
+            {{ c.days_since_order }}d
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endif %}
+
+{# ── Top clientes por LTV ────────────────────────────────────────────────── #}
+<div class="card" style="margin-bottom:24px;">
+  <div class="section-title">Top Clientes por LTV</div>
+  {% if has_customers %}
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Nombre</th>
+        <th>Email</th>
+        <th style="text-align:right;">Órdenes</th>
+        <th style="text-align:right;">LTV Total</th>
+        <th>Última Orden</th>
+        <th>Marketing</th>
+        <th>Tags</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in customers %}
+      <tr>
+        <td style="color:var(--ink-soft);font-size:12px;">{{ loop.index }}</td>
+        <td style="font-weight:600;">{{ c.first_name or '' }} {{ c.last_name or '' }}</td>
+        <td style="color:var(--ink-soft);font-size:12px;">{{ c.email or '—' }}</td>
+        <td style="text-align:right;">{{ c.orders_count or 0 }}</td>
+        <td style="text-align:right;font-weight:600;color:#065f46;">${{ "{:,.0f}".format(c.total_spent | float) }}</td>
+        <td style="color:var(--ink-soft);font-size:12px;">{{ c.last_order_name or '—' }}</td>
+        <td>
+          {% if c.accepts_marketing %}
+          <span class="badge badge-live">Sí</span>
+          {% else %}
+          <span class="badge badge-ready">No</span>
+          {% endif %}
+        </td>
+        <td style="font-size:11px;color:var(--ink-soft);">{{ c.tags[:30] if c.tags else '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="text-align:center;padding:32px;color:var(--ink-soft);font-size:13px;">
+    Sin clientes registrados aún. La tabla se llenará automáticamente cuando lleguen las primeras ventas.
+  </div>
+  {% endif %}
+</div>
+
+{# ── Carritos abandonados ────────────────────────────────────────────────── #}
+<div class="card" style="margin-bottom:24px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+    <div class="section-title" style="margin:0;">Carritos Abandonados</div>
+    {% if abandoned_count > 0 %}
+    <span style="font-size:12px;color:var(--ink-soft);">{{ abandoned_count }} abiertos · ${{ "{:,.0f}".format(revenue_at_risk) }} MXN en riesgo</span>
+    {% endif %}
+  </div>
+
+  {% if abandoned_rows %}
+  <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e;margin-bottom:14px;">
+    Tip: Usa Klaviyo → Flows → Abandoned Cart para enviar email de recuperación automáticamente.
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Email</th>
+        <th style="text-align:right;">Items</th>
+        <th style="text-align:right;">Valor</th>
+        <th>Fecha</th>
+        <th>Acción</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in abandoned_rows %}
+      <tr>
+        <td>{{ c.email }}</td>
+        <td style="text-align:right;">{{ c.items }}</td>
+        <td style="text-align:right;font-weight:600;color:#92400e;">${{ "{:,.0f}".format(c.total) }}</td>
+        <td style="color:var(--ink-soft);font-size:12px;">{{ c.created_at }}</td>
+        <td>
+          {% if c.url %}
+          <a href="{{ c.url }}" target="_blank" rel="noopener"
+             style="font-size:11.5px;color:var(--accent);text-decoration:none;">Recuperar →</a>
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="text-align:center;padding:24px;color:var(--ink-soft);font-size:13px;">
+    Sin carritos abiertos — todos los checkouts iniciados se completaron o expiraron.
+  </div>
+  {% endif %}
+</div>
+
+{# ── Draft orders ────────────────────────────────────────────────────────── #}
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+    <div class="section-title" style="margin:0;">Draft Orders <span style="font-size:11px;font-weight:400;color:var(--ink-soft);">(ventas en progreso / manual)</span></div>
+    {% if draft_count > 0 %}
+    <span style="font-size:12px;color:var(--ink-soft);">{{ draft_count }} abiertos · ${{ "{:,.0f}".format(draft_value) }} MXN potencial</span>
+    {% endif %}
+  </div>
+
+  {% if draft_rows %}
+  <table>
+    <thead>
+      <tr>
+        <th>Draft #</th>
+        <th>Email</th>
+        <th style="text-align:right;">Items</th>
+        <th style="text-align:right;">Valor</th>
+        <th>Estado</th>
+        <th>Fecha</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for d in draft_rows %}
+      <tr>
+        <td style="font-weight:600;">{{ d.name }}</td>
+        <td style="color:var(--ink-soft);font-size:12px;">{{ d.email }}</td>
+        <td style="text-align:right;">{{ d.items }}</td>
+        <td style="text-align:right;font-weight:600;color:#065f46;">${{ "{:,.0f}".format(d.total) }}</td>
+        <td><span class="badge badge-pending">{{ d.status | upper }}</span></td>
+        <td style="color:var(--ink-soft);font-size:12px;">{{ d.created_at }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="text-align:center;padding:24px;color:var(--ink-soft);font-size:13px;">
+    Sin draft orders abiertos.
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

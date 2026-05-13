@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Inventario{% endblock %}
+{% block page_title %}Inventario{% endblock %}
+{% block page_sub %}LEVIA™ Align · stock y cobertura · ⟳ {{ fetched_at }}{% endblock %}
+{% block topbar_right %}
+  <span style="font-size:11px;color:var(--ink-soft);">Actualizado: {{ updated_at }}</span>
+{% endblock %}
+
+{% block content %}
+
+{# ── Reorder alert ────────────────────────────────────────────────────────── #}
+{% if needs_reorder %}
+<div class="alert red" style="margin-bottom:20px;">
+  ⚠ Stock bajo — {{ units_on_hand }} unidades en mano, punto de reorden es {{ reorder_point }} unidades. Considera reabastecer.
+</div>
+{% endif %}
+
+{% if days_coverage is not none and days_coverage < 30 %}
+<div class="alert red" style="margin-bottom:20px;">
+  ⚠ Cobertura crítica — solo {{ days_coverage }} días de stock al ritmo actual de ventas.
+</div>
+{% elif days_coverage is not none and days_coverage < 60 %}
+<div class="alert yellow" style="margin-bottom:20px;">
+  Cobertura de {{ days_coverage }} días — planifica reabastecimiento pronto.
+</div>
+{% endif %}
+
+{# ── KPI Cards ──────────────────────────────────────────────────────────── #}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-bottom:28px;">
+
+  <div class="card card-sm">
+    <div class="stat-label">Stock en Mano</div>
+    <div class="stat-value">{{ units_on_hand }}</div>
+    <div class="stat-sub">unidades · LEVIA Align</div>
+  </div>
+
+  <div class="card card-sm">
+    <div class="stat-label">Valorización</div>
+    <div class="stat-value">${{ "{:,.0f}".format(inventory_value_mxn) }}</div>
+    <div class="stat-sub">MXN · ${{ "{:,.0f}".format(inventory_value_usd) }} USD</div>
+  </div>
+
+  <div class="card card-sm">
+    <div class="stat-label">Días de Cobertura</div>
+    <div class="stat-value {% if days_coverage is not none and days_coverage < 30 %}text-red-600{% endif %}">
+      {% if days_coverage is not none %}{{ days_coverage }}d{% else %}—{% endif %}
+    </div>
+    <div class="stat-sub" style="margin-top:6px;">
+      {% if days_coverage is not none %}
+      <span class="pill {{ coverage_color }}">
+        {% if days_coverage >= 60 %}suficiente{% elif days_coverage >= 30 %}ok{% else %}crítico{% endif %}
+      </span>
+      {% else %}
+      <span style="color:var(--ink-soft);font-size:11px;">sin ventas registradas</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card card-sm">
+    <div class="stat-label">Vendidos (30 días)</div>
+    <div class="stat-value">{{ sold_30d }}</div>
+    <div class="stat-sub">{{ daily_velocity }} unid/día promedio</div>
+  </div>
+
+  <div class="card card-sm">
+    <div class="stat-label">Punto de Reorden</div>
+    <div class="stat-value">{{ reorder_point }}</div>
+    <div class="stat-sub">unidades (30 días de ventas)</div>
+  </div>
+
+  <div class="card card-sm">
+    <div class="stat-label">COGS Unitario</div>
+    <div class="stat-value">${{ "{:,.0f}".format(cogs_unit_mxn) }}</div>
+    <div class="stat-sub">MXN · ${{ "%.0f"|format(26) }} USD</div>
+  </div>
+
+</div>
+
+{# ── Actualizar stock ─────────────────────────────────────────────────────── #}
+<div class="card" style="margin-bottom:24px;">
+  <div class="section-title">Actualizar Stock</div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-bottom:16px;">
+    Ingresa el número de unidades actuales en mano (físico o en almacén del proveedor).
+  </p>
+  <form method="post" action="/inventario/update" style="display:flex;gap:10px;align-items:center;">
+    <input type="number" name="units" value="{{ units_on_hand }}" min="0" max="99999"
+           style="border:1px solid var(--border);border-radius:6px;padding:8px 14px;font-size:15px;
+                  width:140px;background:#fff;color:var(--ink);outline:none;" />
+    <button type="submit"
+            style="background:var(--ink);color:#fff;border:none;padding:8px 20px;
+                   border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">
+      Guardar
+    </button>
+    <span style="font-size:12px;color:var(--ink-soft);">unidades</span>
+  </form>
+</div>
+
+{# ── Proyección ──────────────────────────────────────────────────────────── #}
+{% if units_on_hand > 0 and daily_velocity > 0 %}
+<div class="card">
+  <div class="section-title">Proyección de Agotamiento</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">
+    <div>
+      <div class="stat-label">Al ritmo actual ({{ daily_velocity }} u/día)</div>
+      <div style="font-size:16px;font-weight:600;margin-top:4px;">
+        Agota en ~{{ days_coverage }} días
+      </div>
+    </div>
+    <div>
+      <div class="stat-label">Si vendes 3x más</div>
+      <div style="font-size:16px;font-weight:600;margin-top:4px;">
+        ~{{ (units_on_hand / (daily_velocity * 3)) | int }} días
+      </div>
+    </div>
+    <div>
+      <div class="stat-label">Revenue potencial restante</div>
+      <div style="font-size:16px;font-weight:600;margin-top:4px;color:#065f46;">
+        ~${{ "{:,.0f}".format(units_on_hand * 1299) }} MXN
+      </div>
+      <div style="font-size:11px;color:var(--ink-soft);">a $1,299 precio base</div>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="section-title">Proyección</div>
+  <div style="color:var(--ink-soft);font-size:13px;padding:8px 0;">
+    {% if units_on_hand == 0 %}
+    Ingresa el stock actual para ver proyecciones de agotamiento.
+    {% else %}
+    Sin ventas en los últimos 30 días. La proyección aparecerá cuando haya datos de velocidad.
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,652 @@
+{% extends "base.html" %}
+{% block title %}Ads{% endblock %}
+{% block page_title %}Ads{% endblock %}
+{% block page_sub %}Meta Ads · fase {{ phase | upper }} · target ROAS ≥{{ roas_target }}x · CPA ≤${{ cpa_max }} · CTR ≥{{ ctr_min }}%{% endblock %}
+{% block topbar_right %}
+  <div style="display:flex;align-items:center;gap:10px;">
+    <span style="font-size:11px;color:{% if data_source == 'live' %}#065f46{% else %}var(--ink-soft){% endif %};">
+      {% if data_source == 'live' %}● Meta live{% else %}⟳ sin conexión{% endif %} · {{ fetched_at }}
+    </span>
+    <button onclick="clearCacheAndReload()" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:#fff;cursor:pointer;color:var(--ink);font-weight:500;">↻ Actualizar</button>
+  </div>
+  <script>
+  async function clearCacheAndReload() {
+    const btn = event.target;
+    btn.textContent = '...';
+    btn.disabled = true;
+    await fetch('/ads/clear-cache', {method:'POST'}).catch(()=>{});
+    location.reload();
+  }
+  </script>
+{% endblock %}
+
+{% block content %}
+<style>
+.ads-grid-5    { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; }
+.ads-grid-4    { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+.ads-grid-3    { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+.ads-grid-2    { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.ads-grid-budget { display:grid; grid-template-columns:2fr 1fr; gap:16px; }
+@media (max-width:768px) {
+  .ads-grid-5,.ads-grid-4,.ads-grid-3,.ads-grid-2,.ads-grid-budget { grid-template-columns:1fr !important; }
+}
+@media (min-width:480px) and (max-width:768px) {
+  .ads-grid-5,.ads-grid-4 { grid-template-columns:repeat(2,1fr) !important; }
+  .ads-grid-3              { grid-template-columns:repeat(2,1fr) !important; }
+}
+</style>
+
+{# ── Alerts ─────────────────────────────────────────────────────────────── #}
+{% for a in alerts %}
+<div class="alert {{ a.type }}" style="margin-bottom:10px;">⚠ {{ a.msg }}</div>
+{% endfor %}
+
+{# ── KPI Cards — Fila 1 ─────────────────────────────────────────────────── #}
+<div class="ads-grid-5" style="margin-bottom:12px;">
+  <div class="card card-sm">
+    <div class="stat-label">ROAS Global</div>
+    <div class="stat-value">{{ "%.2f"|format(global_roas) }}x</div>
+    <div class="stat-sub" style="margin-top:5px;">
+      {% if global_roas > 0 %}
+      <span class="pill {{ 'green' if global_roas >= roas_target else ('yellow' if global_roas >= 0.8 else 'red') }}">target {{ roas_target }}x</span>
+      <span style="margin-left:4px;font-size:10px;color:var(--ink-soft);">BE {{ breakeven_roas }}x</span>
+      {% else %}<span style="color:var(--ink-soft);font-size:11px;">sin campañas</span>{% endif %}
+    </div>
+  </div>
+  <div class="card card-sm">
+    <div class="stat-label">Total Spend</div>
+    <div class="stat-value">${{ "{:,.0f}".format(total_spend_mxn) }}</div>
+    <div class="stat-sub">MXN · 7 días</div>
+  </div>
+  <div class="card card-sm">
+    <div class="stat-label">Revenue Ads</div>
+    <div class="stat-value">${{ "{:,.0f}".format(total_revenue_mxn) }}</div>
+    <div class="stat-sub">{{ total_purchases }} compras</div>
+  </div>
+  <div class="card card-sm">
+    <div class="stat-label">CTR Meta</div>
+    <div class="stat-value">{{ "%.2f"|format(meta_ctr) }}%</div>
+    <div class="stat-sub" style="margin-top:5px;">
+      {% if meta_ctr > 0 %}
+      <span class="pill {{ 'green' if meta_ctr >= ctr_min else ('yellow' if meta_ctr >= 0.7 else 'red') }}">target {{ ctr_min }}%</span>
+      {% else %}<span style="color:var(--ink-soft);font-size:11px;">sin datos</span>{% endif %}
+    </div>
+  </div>
+  <div class="card card-sm">
+    <div class="stat-label">CPM</div>
+    <div class="stat-value">${{ "%.0f"|format(meta_cpm) }}</div>
+    <div class="stat-sub">por 1,000 impresiones</div>
+  </div>
+</div>
+
+{# ── KPI Cards — Fila 2 ─────────────────────────────────────────────────── #}
+<div class="ads-grid-5" style="margin-bottom:24px;">
+  <div class="card card-sm">
+    <div class="stat-label">Alcance</div>
+    <div class="stat-value">{{ "{:,}".format(total_reach) }}</div>
+    <div class="stat-sub">personas únicas</div>
+  </div>
+  <div class="card card-sm">
+    <div class="stat-label">Frecuencia</div>
+    <div class="stat-value">{{ "%.2f"|format(avg_frequency) }}x</div>
+    <div class="stat-sub" style="margin-top:5px;">
+      {% if avg_frequency > 0 %}
+      <span class="pill {{ 'red' if avg_frequency >= freq_fatigue else ('yellow' if avg_frequency >= 2.5 else 'green') }}">
+        {% if avg_frequency >= freq_fatigue %}fatiga{% elif avg_frequency >= 2.5 %}alerta{% else %}ok{% endif %}
+      </span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="card card-sm">
+    <div class="stat-label">CPC</div>
+    <div class="stat-value">${{ "%.2f"|format(meta_cpc) }}</div>
+    <div class="stat-sub">por click</div>
+  </div>
+  <div class="card card-sm">
+    <div class="stat-label">CPA</div>
+    <div class="stat-value">${{ "%.0f"|format(meta_cpa) }}</div>
+    <div class="stat-sub" style="margin-top:5px;">
+      {% if meta_cpa > 0 %}
+      <span class="pill {{ 'green' if meta_cpa <= cpa_max else 'red' }}">límite ${{ cpa_max }}</span>
+      {% else %}<span style="color:var(--ink-soft);font-size:11px;">sin datos</span>{% endif %}
+    </div>
+  </div>
+  <div class="card card-sm">
+    <div class="stat-label">Compras</div>
+    <div class="stat-value">{{ total_purchases }}</div>
+    <div class="stat-sub">últimos 7 días</div>
+  </div>
+</div>
+
+{# ── Gráficas de Tendencia 14 días ──────────────────────────────────────── #}
+{% if daily_labels %}
+<div class="ads-grid-2" style="margin-bottom:24px;">
+
+  {# Chart 1: Spend vs Revenue #}
+  <div class="card">
+    <div class="section-title" style="margin-bottom:12px;">Spend vs Revenue — 14 días</div>
+    <canvas id="chartSpendRevenue" height="160"></canvas>
+  </div>
+
+  {# Chart 2: ROAS + CTR #}
+  <div class="card">
+    <div class="section-title" style="margin-bottom:12px;">ROAS y CTR — 14 días</div>
+    <canvas id="chartRoasCtr" height="160"></canvas>
+  </div>
+
+</div>
+<div class="ads-grid-2" style="margin-bottom:24px;">
+
+  {# Chart 3: Reach + Frequency #}
+  <div class="card">
+    <div class="section-title" style="margin-bottom:12px;">Alcance y Frecuencia — 14 días</div>
+    <canvas id="chartReachFreq" height="160"></canvas>
+  </div>
+
+  {# Chart 4: CPM trend #}
+  <div class="card">
+    <div class="section-title" style="margin-bottom:12px;">CPM — 14 días</div>
+    <canvas id="chartCpm" height="160"></canvas>
+  </div>
+
+</div>
+
+<script>
+(function() {
+  const labels = {{ daily_labels | tojson }};
+  const spend  = {{ daily_spend | tojson }};
+  const rev    = {{ daily_revenue | tojson }};
+  const roas   = {{ daily_roas | tojson }};
+  const ctr    = {{ daily_ctr | tojson }};
+  const cpm    = {{ daily_cpm | tojson }};
+  const reach  = {{ daily_reach | tojson }};
+  const freq   = {{ daily_frequency | tojson }};
+
+  const gridColor = 'rgba(0,0,0,0.05)';
+  const font = { family: 'Inter, sans-serif', size: 11 };
+
+  // Chart 1: Spend vs Revenue
+  new Chart(document.getElementById('chartSpendRevenue'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Revenue MXN', data: rev, backgroundColor: 'rgba(107,143,181,0.7)', borderRadius: 4 },
+        { label: 'Spend MXN',   data: spend, backgroundColor: 'rgba(200,161,90,0.5)', borderRadius: 4 },
+      ]
+    },
+    options: {
+      responsive: true, plugins: { legend: { labels: { font } } },
+      scales: {
+        x: { grid: { color: gridColor }, ticks: { font } },
+        y: { grid: { color: gridColor }, ticks: { font, callback: v => '$' + v.toLocaleString() } }
+      }
+    }
+  });
+
+  // Chart 2: ROAS + CTR (dual axis) with breakeven line
+  const breakevenRoas = {{ breakeven_roas }};
+  new Chart(document.getElementById('chartRoasCtr'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'ROAS', data: roas, borderColor: '#6B8FB5', backgroundColor: 'rgba(107,143,181,0.1)', tension: 0.3, yAxisID: 'y', pointRadius: 3 },
+        { label: 'CTR %', data: ctr, borderColor: '#C8A15A', backgroundColor: 'rgba(200,161,90,0.1)', tension: 0.3, yAxisID: 'y1', pointRadius: 3, borderDash: [4,2] },
+        { label: `Breakeven ${breakevenRoas}x`, data: new Array(roas.length).fill(breakevenRoas), borderColor: '#ef4444', borderDash: [6,3], borderWidth: 1.5, pointRadius: 0, yAxisID: 'y' },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { font } } },
+      scales: {
+        x:  { grid: { color: gridColor }, ticks: { font } },
+        y:  { grid: { color: gridColor }, ticks: { font, callback: v => v + 'x' }, title: { display: true, text: 'ROAS', font } },
+        y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { font, callback: v => v + '%' }, title: { display: true, text: 'CTR', font } }
+      }
+    }
+  });
+
+  // Chart 3: Reach + Frequency
+  new Chart(document.getElementById('chartReachFreq'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { type: 'bar',  label: 'Alcance',    data: reach, backgroundColor: 'rgba(143,168,154,0.6)', borderRadius: 4, yAxisID: 'y' },
+        { type: 'line', label: 'Frecuencia', data: freq,  borderColor: '#991b1b', tension: 0.3, yAxisID: 'y1', pointRadius: 3, borderWidth: 2 },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { font } } },
+      scales: {
+        x:  { grid: { color: gridColor }, ticks: { font } },
+        y:  { grid: { color: gridColor }, ticks: { font, callback: v => v.toLocaleString() }, title: { display: true, text: 'Alcance', font } },
+        y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { font }, title: { display: true, text: 'Frecuencia', font } }
+      }
+    }
+  });
+
+  // Chart 4: CPM
+  new Chart(document.getElementById('chartCpm'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'CPM MXN', data: cpm, borderColor: '#8FA89A', backgroundColor: 'rgba(143,168,154,0.15)', tension: 0.3, fill: true, pointRadius: 3 },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { font } } },
+      scales: {
+        x: { grid: { color: gridColor }, ticks: { font } },
+        y: { grid: { color: gridColor }, ticks: { font, callback: v => '$' + v } }
+      }
+    }
+  });
+})();
+</script>
+{% endif %}
+
+{# ── Salud de Video ──────────────────────────────────────────────────────── #}
+{% if has_video %}
+<div class="card" style="margin-bottom:24px;">
+  <div class="section-title">Salud de Video</div>
+  <div class="ads-grid-4" style="margin-top:12px;">
+    <div>
+      <div class="stat-label">Hook Rate</div>
+      <div class="stat-value" style="font-size:22px;">{{ global_hook_rate }}%</div>
+      <div class="stat-sub">impresiones que inician video</div>
+    </div>
+    <div>
+      <div class="stat-label">Hold Rate</div>
+      <div class="stat-value" style="font-size:22px;">{{ global_hold_rate }}%</div>
+      <div class="stat-sub">ven el video completo</div>
+    </div>
+    <div>
+      <div class="stat-label">ThruPlays</div>
+      <div class="stat-value" style="font-size:22px;">{{ "{:,}".format(total_thruplays) }}</div>
+      <div class="stat-sub">reproducciones completas</div>
+    </div>
+    <div>
+      <div class="stat-label">Watch Avg.</div>
+      <div class="stat-value" style="font-size:22px;">{{ avg_watch_sec }}s</div>
+      <div class="stat-sub">duración promedio vista</div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── Funnel de Conversión ────────────────────────────────────────────────── #}
+<div class="card" style="margin-bottom:24px;">
+  <div class="section-title">Funnel de Conversión Meta</div>
+  <div style="margin-top:16px;">
+
+    {# Funnel visual — 6 pasos #}
+    <div style="display:flex;align-items:stretch;gap:0;overflow-x:auto;padding-bottom:4px;">
+
+      {% set steps = [
+        ("Impresiones",      total_impressions,     0,                      "—",                          "#6B8FB5"),
+        ("Link Clicks",      total_clicks,           funnel_imp_to_click,    "—",                          "#8FA89A"),
+        ("View Content",     total_view_content,     funnel_click_to_vc,     cost_per_view_content,        "#C8A15A"),
+        ("Add to Cart",      total_atc,              funnel_vc_to_atc,       cost_per_atc,                 "#f59e0b"),
+        ("Initiate Checkout",total_init_checkout,    funnel_atc_to_ic,       cost_per_init_checkout,       "#ef4444"),
+        ("Compra",           total_purchases,        funnel_ic_to_pur,       cost_per_purchase,            "#065f46"),
+      ] %}
+
+      {% for label, count, rate, cost, color in steps %}
+      <div style="flex:1;min-width:130px;position:relative;">
+        {# Step card #}
+        <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 12px;margin:0 4px;text-align:center;height:100%;">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-soft);font-weight:600;margin-bottom:6px;">{{ label }}</div>
+          <div style="font-family:'Fraunces',serif;font-size:22px;font-weight:700;color:{{ color }};line-height:1.1;">
+            {% if count > 1000 %}{{ "{:,.0f}".format(count) }}{% elif count > 0 %}{{ count }}{% else %}—{% endif %}
+          </div>
+          {% if cost and cost != "—" and cost > 0 %}
+          <div style="font-size:11px;color:var(--ink-soft);margin-top:4px;">${{ "{:,.0f}".format(cost) }} MXN c/u</div>
+          {% else %}
+          <div style="font-size:11px;color:transparent;">·</div>
+          {% endif %}
+        </div>
+        {# Arrow + rate to next step #}
+        {% if not loop.last %}
+        <div style="position:absolute;top:50%;right:-18px;transform:translateY(-50%);z-index:2;text-align:center;width:36px;">
+          <div style="font-size:14px;color:var(--ink-soft);">→</div>
+          {% if rate and rate != "—" and rate > 0 %}
+          <div style="font-size:9px;font-weight:700;color:{% if rate >= 5 %}#065f46{% elif rate >= 1 %}#92400e{% else %}#991b1b{% endif %};white-space:nowrap;">{{ "%.1f"|format(rate) }}%</div>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+
+    </div>
+
+    {# Summary row #}
+    <div class="ads-grid-3" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
+      <div style="text-align:center;">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-soft);font-weight:600;">Click → Compra</div>
+        <div style="font-family:'Fraunces',serif;font-size:20px;font-weight:700;color:var(--ink);margin-top:4px;">
+          {% if funnel_overall > 0 %}{{ "%.2f"|format(funnel_overall) }}%{% else %}—{% endif %}
+        </div>
+        <div style="font-size:11px;color:var(--ink-soft);">tasa conversión global</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-soft);font-weight:600;">Add to Cart</div>
+        <div style="font-family:'Fraunces',serif;font-size:20px;font-weight:700;color:{% if cost_per_atc > 0 and cost_per_atc <= 60 %}#065f46{% elif cost_per_atc > 0 %}#92400e{% else %}var(--ink){% endif %};margin-top:4px;">
+          {% if cost_per_atc > 0 %} ${{ "{:,.0f}".format(cost_per_atc) }}{% else %}—{% endif %}
+        </div>
+        <div style="font-size:11px;color:var(--ink-soft);">costo por ATC (MXN)</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-soft);font-weight:600;">Initiate Checkout</div>
+        <div style="font-family:'Fraunces',serif;font-size:20px;font-weight:700;color:{% if cost_per_init_checkout > 0 and cost_per_init_checkout <= 120 %}#065f46{% elif cost_per_init_checkout > 0 %}#92400e{% else %}var(--ink){% endif %};margin-top:4px;">
+          {% if cost_per_init_checkout > 0 %}${{ "{:,.0f}".format(cost_per_init_checkout) }}{% else %}—{% endif %}
+        </div>
+        <div style="font-size:11px;color:var(--ink-soft);">costo por IC (MXN)</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{# ── Budget + Distribución por tipo ─────────────────────────────────────── #}
+<div class="ads-grid-budget" style="margin-bottom:24px;">
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <div class="section-title" style="margin:0;">Presupuesto de Testing</div>
+      <span style="font-size:13px;color:var(--ink-soft);">${{ "{:,.0f}".format(budget_used) }} / ${{ "{:,.0f}".format(budget_total) }} MXN</span>
+    </div>
+    <div class="progress-track" style="height:8px;">
+      <div class="progress-fill" style="width:{{ budget_pct }}%;"></div>
+    </div>
+    <div style="margin-top:8px;font-size:12px;color:var(--ink-soft);">
+      Restante: <strong style="color:var(--ink);">${{ "{:,.0f}".format(budget_remaining) }} MXN</strong> · {{ budget_pct }}% usado
+    </div>
+    <div style="margin-top:12px;font-size:11px;color:var(--ink-soft);">Breakeven ROAS: <strong style="color:var(--ink);">{{ breakeven_roas }}x</strong> · basado en precio ${{ "{:,.0f}".format(1299) }} – COGS ${{ "{:,.0f}".format(449) }} MXN</div>
+  </div>
+
+  {# Donut: distribución de spend por tipo de campaña (A3) #}
+  <div class="card" style="display:flex;flex-direction:column;align-items:center;">
+    <div class="section-title" style="margin-bottom:8px;text-align:center;width:100%;">Gasto por Tipo</div>
+    <canvas id="chartBudgetDonut" height="130" style="max-width:140px;"></canvas>
+    <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;">
+      {% set donut_colors = ['#6B8FB5','#C8A15A','#8FA89A','#4A5B76'] %}
+      {% for i in range(budget_type_labels|length) %}
+      {% if budget_type_values[i] > 0 %}
+      <span style="font-size:10px;display:flex;align-items:center;gap:3px;">
+        <span style="width:8px;height:8px;border-radius:50%;background:{{ donut_colors[i % 4] }};display:inline-block;"></span>
+        {{ budget_type_labels[i] }}: ${{ "{:,.0f}".format(budget_type_values[i]) }}
+      </span>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+</div>
+<script>
+(function(){
+  const ctx = document.getElementById('chartBudgetDonut');
+  if (!ctx) return;
+  const labels = {{ budget_type_labels | tojson }};
+  const values = {{ budget_type_values | tojson }};
+  const colors = ['#6B8FB5','#C8A15A','#8FA89A','#4A5B76'];
+  const font = { family: 'Inter, sans-serif', size: 10 };
+  new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }] },
+    options: {
+      responsive: true, cutout: '65%',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: $${ctx.parsed.toLocaleString()} MXN` } }
+      }
+    }
+  });
+})();
+</script>
+
+{# ── Adsets breakdown ────────────────────────────────────────────────────── #}
+{% if adsets %}
+<div class="card" style="margin-bottom:24px;">
+  <div class="section-title">Conjuntos de Anuncios (Adsets)</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Conjunto</th>
+        <th>Status</th>
+        <th style="text-align:right;">Budget/día</th>
+        <th style="text-align:right;">Spend</th>
+        <th style="text-align:right;">Alcance</th>
+        <th style="text-align:right;">Freq.</th>
+        <th style="text-align:right;">CTR</th>
+        <th style="text-align:right;">ROAS</th>
+        <th style="text-align:right;">Compras</th>
+        <th style="text-align:right;">Score</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in adsets %}
+      <tr>
+        <td style="font-weight:600;max-width:180px;font-size:12px;">{{ a.name | truncate(30) }}</td>
+        <td><span class="badge {% if a.status == 'ACTIVE' %}badge-live{% elif a.status == 'PAUSED' %}badge-pending{% else %}badge-ready{% endif %}">{{ a.status }}</span></td>
+        <td style="text-align:right;">${{ "{:,.0f}".format(a.budget_day) }}</td>
+        <td style="text-align:right;">${{ "{:,.0f}".format(a.spend_mxn) }}</td>
+        <td style="text-align:right;">{{ "{:,}".format(a.reach) }}</td>
+        <td style="text-align:right;"><span class="pill {{ a.freq_color }}">{{ "%.1f"|format(a.frequency) }}x</span></td>
+        <td style="text-align:right;"><span class="pill {{ a.ctr_color }}">{{ a.ctr_pct }}%</span></td>
+        <td style="text-align:right;">
+          {% if a.roas > 0 %}<span class="pill {{ a.roas_color }}">{{ "%.2f"|format(a.roas) }}x</span>{% else %}—{% endif %}
+        </td>
+        <td style="text-align:right;font-weight:600;">{{ a.purchases }}</td>
+        <td style="text-align:right;">
+          <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end;">
+            <div style="width:40px;height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
+              <div style="width:{{ a.efficiency_score }}%;height:100%;background:{% if a.efficiency_score >= 60 %}#065f46{% elif a.efficiency_score >= 35 %}#92400e{% else %}#991b1b{% endif %};border-radius:3px;"></div>
+            </div>
+            <span style="font-size:11px;font-weight:600;color:var(--ink);">{{ a.efficiency_score }}</span>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{# ── Creative Scorecard (C1) — nivel de anuncio individual ──────────────── #}
+{% if creative_ads %}
+<div class="card" style="margin-bottom:24px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <div class="section-title" style="margin:0;">Creative Scorecard — Anuncios Individuales</div>
+    <span style="font-size:11px;color:var(--ink-soft);">Hook Rate &gt;30% + CPA ok = Escalar · Hook &lt;15% o CPA 1.5× = Matar</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Anuncio</th>
+        <th style="text-align:right;">Hook%</th>
+        <th style="text-align:right;">Hold%</th>
+        <th style="text-align:right;">CTR</th>
+        <th style="text-align:right;">CPA</th>
+        <th style="text-align:right;">ROAS</th>
+        <th style="text-align:right;">Spend</th>
+        <th style="text-align:center;">Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ad in creative_ads %}
+      <tr>
+        <td style="font-size:12px;font-weight:500;max-width:200px;">{{ ad.name | truncate(35) }}</td>
+        <td style="text-align:right;">
+          <span style="font-weight:700;color:{% if ad.hook_rate_pct > 30 %}#065f46{% elif ad.hook_rate_pct > 15 %}#92400e{% else %}#991b1b{% endif %};">
+            {{ ad.hook_rate_pct }}%
+          </span>
+        </td>
+        <td style="text-align:right;color:var(--ink-soft);">{{ ad.hold_rate_pct }}%</td>
+        <td style="text-align:right;color:var(--ink-soft);">{{ ad.ctr_pct }}%</td>
+        <td style="text-align:right;">
+          {% if ad.cpa_mxn > 0 %}
+          <span style="color:{% if ad.cpa_mxn <= cpa_max %}#065f46{% else %}#991b1b{% endif %};">${{ "%.0f"|format(ad.cpa_mxn) }}</span>
+          {% else %}—{% endif %}
+        </td>
+        <td style="text-align:right;">
+          {% if ad.roas > 0 %}{{ "%.2f"|format(ad.roas) }}x{% else %}—{% endif %}
+        </td>
+        <td style="text-align:right;">${{ "{:,.0f}".format(ad.spend_mxn) }}</td>
+        <td style="text-align:center;">
+          <span class="pill {{ ad.scorecard_color }}" style="font-size:10px;font-weight:700;">
+            {% if ad.scorecard_status == 'escalar' %}↑ Escalar{% elif ad.scorecard_status == 'matar' %}✕ Matar{% else %}~ Iterar{% endif %}
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{# ── Placement Breakdown (C2) ────────────────────────────────────────────── #}
+{% if placements %}
+<div class="card" style="margin-bottom:24px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <div class="section-title" style="margin:0;">Breakdown por Placement — 7 días</div>
+    <span style="font-size:11px;color:var(--ink-soft);">🔴 CPM alto + CTR bajo = dinero quemado</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Plataforma</th>
+        <th>Placement</th>
+        <th style="text-align:right;">Spend</th>
+        <th style="text-align:right;">%</th>
+        <th style="text-align:right;">CTR</th>
+        <th style="text-align:right;">CPM</th>
+        <th style="text-align:right;">ROAS</th>
+        <th style="text-align:right;">Compras</th>
+        <th style="text-align:center;">Señal</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in placements %}
+      <tr>
+        <td style="font-weight:600;font-size:12px;">{{ p.platform }}</td>
+        <td style="color:var(--ink-soft);font-size:12px;">{{ p.position }}</td>
+        <td style="text-align:right;">${{ "{:,.0f}".format(p.spend_mxn) }}</td>
+        <td style="text-align:right;color:var(--ink-soft);">{{ p.spend_pct }}%</td>
+        <td style="text-align:right;">{{ p.ctr }}%</td>
+        <td style="text-align:right;">${{ p.cpm_mxn }}</td>
+        <td style="text-align:right;">{% if p.roas > 0 %}{{ "%.2f"|format(p.roas) }}x{% else %}—{% endif %}</td>
+        <td style="text-align:right;font-weight:600;">{{ p.purchases }}</td>
+        <td style="text-align:center;"><span class="pill {{ p.signal }}" style="font-size:10px;">{{ '🔴' if p.signal == 'red' else ('🟡' if p.signal == 'yellow' else '🟢') }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{# ── Campañas Meta live ───────────────────────────────────────────────────── #}
+<div class="card" style="margin-bottom:24px;"
+     hx-get="/ads/api/campaigns"
+     hx-trigger="every 300s"
+     hx-swap="outerHTML">
+  <div class="section-title">Campañas Meta — {{ 'En Vivo' if data_source == 'live' else 'Sin Conexión' }}</div>
+  {% if live_campaigns %}
+  <table>
+    <thead>
+      <tr>
+        <th>Campaña</th>
+        <th>Status</th>
+        <th>Aprend.</th>
+        <th style="text-align:right;">Spend</th>
+        <th style="text-align:right;">Revenue</th>
+        <th style="text-align:right;">ROAS</th>
+        <th style="text-align:right;">CTR</th>
+        <th style="text-align:right;">CPA</th>
+        <th style="text-align:right;">Alcance</th>
+        <th style="text-align:right;">Freq.</th>
+        <th style="text-align:right;">Compras</th>
+        <th>Calidad</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in live_campaigns %}
+      <tr>
+        <td style="font-weight:600;max-width:180px;font-size:12px;">{{ c.name | truncate(28) }}</td>
+        <td><span class="badge {% if c.status == 'ACTIVE' %}badge-live{% elif c.status == 'PAUSED' %}badge-pending{% else %}badge-ready{% endif %}">{{ c.status }}</span></td>
+        <td>
+          {% if c.learning_phase == 'LEARNING' %}
+          <span style="background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;">⏳ Aprendiendo</span>
+          {% elif c.learning_phase == 'LEARNING_LIMITED' %}
+          <span style="background:#fee2e2;color:#991b1b;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;">⚠ Limitado</span>
+          {% else %}<span style="color:var(--ink-soft);font-size:11px;">—</span>{% endif %}
+        </td>
+        <td style="text-align:right;">${{ "{:,.0f}".format(c.spend_mxn) }}</td>
+        <td style="text-align:right;color:#065f46;">${{ "{:,.0f}".format(c.revenue_mxn) }}</td>
+        <td style="text-align:right;">
+          {% if c.roas > 0 %}<span class="pill {{ c.roas_color }}">{{ "%.2f"|format(c.roas) }}x</span>{% else %}—{% endif %}
+        </td>
+        <td style="text-align:right;">
+          {% if c.ctr_pct > 0 %}<span class="pill {{ c.ctr_color }}">{{ c.ctr_pct }}%</span>{% else %}—{% endif %}
+        </td>
+        <td style="text-align:right;">
+          {% if c.cpa_mxn > 0 %}<span class="pill {{ c.cpa_color }}">${{ "%.0f"|format(c.cpa_mxn) }}</span>{% else %}—{% endif %}
+        </td>
+        <td style="text-align:right;">{{ "{:,}".format(c.reach) }}</td>
+        <td style="text-align:right;">
+          {% if c.frequency > 0 %}<span class="pill {{ c.freq_color }}">{{ "%.1f"|format(c.frequency) }}x</span>{% else %}—{% endif %}
+        </td>
+        <td style="text-align:right;font-weight:600;">{{ c.purchases }}</td>
+        <td>
+          {% if c.quality_badge %}
+          <span class="pill {{ c.quality_badge }}" style="font-size:10px;">
+            {% if c.quality_ranking == 'ABOVE_AVERAGE' %}↑ alto{% elif c.quality_ranking == 'BELOW_AVERAGE' %}↓ bajo{% else %}medio{% endif %}
+          </span>
+          {% else %}<span style="color:var(--ink-soft);font-size:11px;">—</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="text-align:center;padding:32px;color:var(--ink-soft);font-size:13px;">
+    {% if data_source == 'unavailable' %}
+    Sin conexión a Meta API — verifica META_ACCESS_TOKEN y META_AD_ACCOUNT_ID en .env
+    {% else %}
+    Sin campañas activas en este ad account.
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{# ── Log de decisiones ────────────────────────────────────────────────────── #}
+<div class="card">
+  <div class="section-title">Log de Decisiones del Agente</div>
+  {% if decisions %}
+  <table>
+    <thead><tr><th>Fecha</th><th>Decisión</th><th>Razón</th><th>Acción</th></tr></thead>
+    <tbody>
+      {% for d in decisions %}
+      <tr>
+        <td style="color:var(--ink-soft);white-space:nowrap;font-size:12px;">{{ d.at[:10] if d.at else '—' }}</td>
+        <td style="font-weight:500;">{{ d.decision }}</td>
+        <td style="color:var(--ink-soft);font-size:12px;">{{ d.reason }}</td>
+        <td>
+          <span class="badge {% if 'WINNER' in (d.action or '') %}badge-live{% elif 'kill' in (d.action or '').lower() %}badge-pending{% else %}badge-ready{% endif %}">
+            {{ d.action | truncate(30) if d.action else '—' }}
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="color:var(--ink-soft);font-size:13px;">Sin decisiones registradas.</div>
+  {% endif %}
+</div>
+
+{% endblock %}

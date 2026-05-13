@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+{% block title %}Analítica{% endblock %}
+{% block page_title %}Analítica{% endblock %}
+{% block page_sub %}Estrategia · LTV:CAC · Forecasting · Retención · Geografía · {{ now }}{% endblock %}
+
+{% block content %}
+
+{# ── KPIs Estratégicos ───────────────────────────────────────────────────── #}
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px;">
+
+  <div class="card card-sm">
+    <div class="stat-label">LTV Promedio</div>
+    <div class="stat-value">${{ "{:,.0f}".format(ltv) }}</div>
+    <div class="stat-sub">MXN · valor de vida del cliente</div>
+  </div>
+
+  <div class="card card-sm">
+    <div class="stat-label">CAC Actual</div>
+    <div class="stat-value">${{ "{:,.0f}".format(cac) }}</div>
+    <div class="stat-sub">MXN · costo de adquisición</div>
+  </div>
+
+  <div class="card card-sm">
+    <div class="stat-label">LTV : CAC</div>
+    <div class="stat-value">{{ "%.1f"|format(ltv_cac_ratio) }}x</div>
+    <div class="stat-sub" style="margin-top:5px;">
+      <span class="pill {{ ratio_color }}">{{ ratio_label }}</span>
+      <span style="font-size:10px;color:var(--ink-soft);margin-left:4px;">ideal ≥3x</span>
+    </div>
+  </div>
+
+  <div class="card card-sm">
+    <div class="stat-label">Payback Period</div>
+    <div class="stat-value">{% if payback_days > 0 %}{{ payback_days }}d{% else %}—{% endif %}</div>
+    <div class="stat-sub" style="margin-top:5px;">
+      {% if payback_days > 0 %}
+      <span class="pill {{ payback_color }}">{% if payback_days <= 60 %}rápido{% elif payback_days <= 120 %}ok{% else %}lento{% endif %}</span>
+      {% else %}<span style="color:var(--ink-soft);font-size:11px;">sin datos</span>{% endif %}
+    </div>
+  </div>
+
+</div>
+
+{# ── Forecast 30 días ────────────────────────────────────────────────────── #}
+<div class="card" style="margin-bottom:24px;">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+    <div>
+      <div class="section-title" style="margin:0;">Proyección — próximos 30 días</div>
+      <div style="font-size:12px;color:var(--ink-soft);margin-top:3px;">
+        Confianza: <strong>{{ confidence_label }}</strong> · basada en regresión lineal de órdenes históricas
+      </div>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:24px;font-weight:700;font-family:'Fraunces',serif;color:var(--ink);">
+        ${{ "{:,.0f}".format(forecast_revenue) }}
+      </div>
+      <div style="font-size:12px;color:var(--ink-soft);">revenue proyectado MXN</div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
+    <div style="background:var(--bone-soft);border-radius:8px;padding:12px;">
+      <div class="stat-label">Órdenes proy.</div>
+      <div style="font-size:20px;font-weight:700;font-family:'Fraunces',serif;">{{ forecast_orders }}</div>
+    </div>
+    <div style="background:var(--bone-soft);border-radius:8px;padding:12px;">
+      <div class="stat-label">Promedio diario actual</div>
+      <div style="font-size:20px;font-weight:700;font-family:'Fraunces',serif;">${{ "{:,.0f}".format(daily_avg) }}</div>
+    </div>
+    <div style="background:var(--bone-soft);border-radius:8px;padding:12px;">
+      <div class="stat-label">Tendencia diaria</div>
+      <div style="font-size:20px;font-weight:700;font-family:'Fraunces',serif;color:{% if daily_avg_trend >= 0 %}#065f46{% else %}#991b1b{% endif %};">
+        {% if daily_avg_trend >= 0 %}+{% endif %}${{ "{:,.0f}".format(daily_avg_trend) }}
+      </div>
+    </div>
+    <div style="background:var(--bone-soft);border-radius:8px;padding:12px;">
+      <div class="stat-label">Dirección</div>
+      <div style="font-size:26px;font-weight:700;color:{{ trend_color }};">{{ trend_icon }}</div>
+    </div>
+  </div>
+
+  {% if hist_labels %}
+  <canvas id="chartForecast" height="120"></canvas>
+  <script>
+  (function() {
+    const histLabels = {{ hist_labels | tojson }};
+    const histRev    = {{ hist_revenue | tojson }};
+    const projLabels = {{ proj_labels | tojson }};
+    const projRev    = {{ proj_revenue | tojson }};
+
+    const allLabels = [...histLabels, ...projLabels];
+    const histData  = [...histRev, ...new Array(projLabels.length).fill(null)];
+    const projData  = [...new Array(histLabels.length).fill(null), ...projRev];
+
+    const font = { family: 'Inter, sans-serif', size: 11 };
+    new Chart(document.getElementById('chartForecast'), {
+      type: 'line',
+      data: {
+        labels: allLabels,
+        datasets: [
+          { label: 'Histórico', data: histData, borderColor: '#6B8FB5', backgroundColor: 'rgba(107,143,181,0.1)', fill: true, tension: 0.3, pointRadius: 2 },
+          { label: 'Proyección', data: projData, borderColor: '#C8A15A', backgroundColor: 'rgba(200,161,90,0.08)', fill: true, tension: 0.3, borderDash: [6,3], pointRadius: 0 },
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { labels: { font } } },
+        scales: {
+          x: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font, maxTicksLimit: 12 } },
+          y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font, callback: v => '$' + v.toLocaleString() } }
+        }
+      }
+    });
+  })();
+  </script>
+  {% else %}
+  <div style="text-align:center;padding:20px;color:var(--ink-soft);font-size:13px;">Sin suficientes órdenes históricas para proyectar.</div>
+  {% endif %}
+</div>
+
+{# ── Patrones por día de semana ──────────────────────────────────────────── #}
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+
+  <div class="card">
+    <div class="section-title" style="margin-bottom:4px;">Revenue Promedio por Día</div>
+    <div style="font-size:12px;color:var(--ink-soft);margin-bottom:12px;">
+      Mejor día: <strong style="color:var(--ink);">{{ dow_best_day }}</strong>
+      · ${{ "{:,.0f}".format(dow_best_revenue) }} promedio
+    </div>
+    {% if dow_labels %}
+    <canvas id="chartDowRevenue" height="160"></canvas>
+    {% else %}
+    <div style="color:var(--ink-soft);font-size:13px;padding:20px 0;">Sin datos suficientes.</div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="section-title" style="margin-bottom:4px;">Órdenes Promedio por Día</div>
+    <div style="font-size:12px;color:var(--ink-soft);margin-bottom:12px;">
+      Úsalo para planear la activación de ads por horario
+    </div>
+    {% if dow_labels %}
+    <canvas id="chartDowOrders" height="160"></canvas>
+    {% else %}
+    <div style="color:var(--ink-soft);font-size:13px;padding:20px 0;">Sin datos suficientes.</div>
+    {% endif %}
+  </div>
+
+</div>
+
+{% if dow_labels %}
+<script>
+(function() {
+  const labels = {{ dow_labels | tojson }};
+  const avgRev = {{ dow_avg_revenue | tojson }};
+  const avgOrd = {{ dow_avg_orders | tojson }};
+  const font = { family: 'Inter, sans-serif', size: 11 };
+  const gridColor = 'rgba(0,0,0,0.05)';
+
+  new Chart(document.getElementById('chartDowRevenue'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Revenue prom. MXN', data: avgRev, backgroundColor: labels.map((_, i) => avgRev[i] === Math.max(...avgRev) ? '#C8A15A' : 'rgba(107,143,181,0.6)'), borderRadius: 5 }] },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { grid: { color: gridColor }, ticks: { font } }, y: { grid: { color: gridColor }, ticks: { font, callback: v => '$' + v.toLocaleString() } } } }
+  });
+  new Chart(document.getElementById('chartDowOrders'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Órdenes prom.', data: avgOrd, backgroundColor: labels.map((_, i) => avgOrd[i] === Math.max(...avgOrd) ? '#8FA89A' : 'rgba(143,168,154,0.6)'), borderRadius: 5 }] },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { grid: { color: gridColor }, ticks: { font } }, y: { grid: { color: gridColor }, ticks: { font } } } }
+  });
+})();
+</script>
+{% endif %}
+
+{# ── Retención por Cohortes ──────────────────────────────────────────────── #}
+<div class="card" style="margin-bottom:24px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+    <div class="section-title" style="margin:0;">Retención de Clientes por Cohorte</div>
+    <div style="font-size:13px;color:var(--ink-soft);">
+      Retención global: <strong style="color:var(--ink);">{{ overall_retention }}%</strong>
+      · {{ overall_acquired }} adquiridos
+    </div>
+  </div>
+  {% if cohort_rows %}
+  <table>
+    <thead>
+      <tr>
+        <th>Mes adquisición</th>
+        <th style="text-align:right;">Adquiridos</th>
+        <th style="text-align:right;">Repitieron</th>
+        <th style="text-align:right;">Retención %</th>
+        <th style="width:120px;">Barra</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in cohort_rows %}
+      <tr>
+        <td style="font-weight:500;">{{ c.month }}</td>
+        <td style="text-align:right;">{{ c.acquired }}</td>
+        <td style="text-align:right;">{{ c.returned }}</td>
+        <td style="text-align:right;">
+          <span class="pill {{ c.color }}">{{ c.retention_pct }}%</span>
+        </td>
+        <td>
+          <div class="progress-track">
+            <div class="progress-fill" style="width:{{ [c.retention_pct, 100] | min }}%;background:{% if c.color == 'green' %}#6B8FB5{% elif c.color == 'yellow' %}#C8A15A{% else %}#f87171{% endif %};"></div>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="color:var(--ink-soft);font-size:13px;padding:16px 0;">Sin datos de clientes para calcular cohortes.</div>
+  {% endif %}
+</div>
+
+{# ── Geografía ────────────────────────────────────────────────────────────── #}
+<div class="card" style="margin-bottom:24px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+    <div class="section-title" style="margin:0;">Ventas por Estado</div>
+    <div style="font-size:13px;color:var(--ink-soft);">
+      Estado top: <strong style="color:var(--ink);">{{ geo_top_state }}</strong>
+      · {{ geo_total_states }} estados
+    </div>
+  </div>
+  {% if geo_states %}
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Estado</th>
+        <th style="text-align:right;">Órdenes</th>
+        <th style="text-align:right;">Revenue</th>
+        <th style="text-align:right;">% Revenue</th>
+        <th style="width:120px;">Barra</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in geo_states %}
+      <tr>
+        <td style="color:var(--ink-soft);font-size:12px;">{{ loop.index }}</td>
+        <td style="font-weight:{% if loop.index == 1 %}600{% else %}400{% endif %};">{{ s.name }}</td>
+        <td style="text-align:right;">{{ s.orders }}</td>
+        <td style="text-align:right;">${{ "{:,.0f}".format(s.revenue) }}</td>
+        <td style="text-align:right;"><span class="pill {% if loop.index == 1 %}green{% else %}{% endif %}" style="background:{% if loop.index > 1 %}#f3efe6{% endif %};color:var(--ink-soft);">{{ s.pct_revenue }}%</span></td>
+        <td>
+          <div class="progress-track">
+            <div class="progress-fill" style="width:{{ s.pct_revenue }}%;"></div>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="color:var(--ink-soft);font-size:13px;padding:16px 0;">Sin datos geográficos en las órdenes (requiere campo shipping_address).</div>
+  {% endif %}
+</div>
+
+{# ── Contexto de datos ───────────────────────────────────────────────────── #}
+<div style="font-size:11px;color:var(--ink-soft);padding:8px 0;border-top:1px solid var(--border);">
+  Basado en {{ total_orders_90d }} órdenes (90 días) · {{ total_customers }} clientes · Ad spend 7d: ${{ "{:,.0f}".format(ad_spend_7d) }} MXN
+</div>
+
+{% endblock %}

@@ -1,0 +1,495 @@
+{% extends "base.html" %}
+{% block title %}Creativos{% endblock %}
+{% block page_title %}Creativos{% endblock %}
+{% block page_sub %}{{ total }} assets · {{ cold_count }} cold · {{ high_priority_count }} prioridad alta{% endblock %}
+
+{% block content %}
+
+{# ─── Tab nav ──────────────────────────────────────────────────────────────── #}
+<div style="display:flex;gap:4px;margin-bottom:24px;border-bottom:2px solid var(--border);padding-bottom:0;">
+  <button id="tab-btn-inventario" onclick="switchTab('inventario')"
+    style="padding:8px 18px;border:none;border-bottom:2px solid var(--ink);margin-bottom:-2px;background:none;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;border-radius:0;">
+    Inventario
+  </button>
+  <button id="tab-btn-testing" onclick="switchTab('testing')"
+    style="padding:8px 18px;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;background:none;font-size:13px;font-weight:600;color:var(--ink-soft);cursor:pointer;border-radius:0;">
+    Testing
+    <span style="margin-left:5px;background:#e0e7ff;color:#3730a3;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;">{{ testing_stats.total }}</span>
+  </button>
+</div>
+
+{# ═══════════ TAB: INVENTARIO ════════════════════════════════════════════════ #}
+<div id="tab-inventario">
+
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+{# PANEL A — Cobertura de avatares                                            #}
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+<div style="margin-bottom:28px;">
+  <div class="section-title">Cobertura de Avatares</div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;">
+    {% for av in avatar_coverage %}
+    {% set bg = "#d1fae5" if av.status == "covered" else ("#fef3c7" if av.status == "partial" else "#fee2e2") %}
+    {% set fg = "#065f46" if av.status == "covered" else ("#92400e" if av.status == "partial" else "#991b1b") %}
+    {% set dot = "✅" if av.status == "covered" else ("⚠️" if av.status == "partial" else "❌") %}
+    <div style="background:{{ bg }};color:{{ fg }};border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;"
+         title="{{ av.frames | join(', ') if av.frames else 'Sin creativo aún' }}">
+      {{ dot }} {{ av.icon }} {{ av.avatar }}
+      {% if av.frames %}<span style="opacity:.6;font-weight:400;font-size:11px;">({{ av.frames | join(', ') }})</span>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  <div style="margin-top:8px;font-size:11px;color:var(--ink-soft);">
+    Pasa el cursor sobre cada chip para ver los frame IDs. ❌ = pendiente de producción.
+  </div>
+</div>
+
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+{# PANEL B — Matriz ángulo × prioridad                                        #}
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+<div style="margin-bottom:28px;">
+  <div class="section-title">Ángulos en Inventario</div>
+  <div style="overflow-x:auto;margin-top:10px;">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead>
+        <tr style="background:var(--bone-soft);">
+          <th style="padding:8px 12px;text-align:left;font-weight:600;color:var(--ink-soft);border-bottom:1px solid var(--border);">Frame</th>
+          <th style="padding:8px 12px;text-align:left;font-weight:600;color:var(--ink-soft);border-bottom:1px solid var(--border);">Ángulo</th>
+          <th style="padding:8px 12px;text-align:left;font-weight:600;color:var(--ink-soft);border-bottom:1px solid var(--border);">Avatar</th>
+          <th style="padding:8px 12px;text-align:center;font-weight:600;color:var(--ink-soft);border-bottom:1px solid var(--border);">Fase</th>
+          <th style="padding:8px 12px;text-align:center;font-weight:600;color:var(--ink-soft);border-bottom:1px solid var(--border);">Prioridad</th>
+          <th style="padding:8px 12px;text-align:left;font-weight:600;color:var(--ink-soft);border-bottom:1px solid var(--border);">Brecha de mercado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for frame_id, meta in angle_meta.items() %}
+        {% set prio_bg = "#d1fae5" if meta.priority == "alta" else ("#fef3c7" if meta.priority == "media" else "#f3f4f6") %}
+        {% set prio_fg = "#065f46" if meta.priority == "alta" else ("#92400e" if meta.priority == "media" else "#6b7280") %}
+        <tr style="border-bottom:1px solid var(--border);transition:background .15s;" onmouseover="this.style.background='var(--bone-soft)'" onmouseout="this.style.background=''">
+          <td style="padding:8px 12px;font-family:'Fraunces',serif;font-weight:600;color:var(--ink);">{{ frame_id }}</td>
+          <td style="padding:8px 12px;color:var(--ink);">{{ meta.angle }}</td>
+          <td style="padding:8px 12px;color:var(--ink-soft);">{{ meta.avatar }}</td>
+          <td style="padding:8px 12px;text-align:center;">
+            <span style="font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;background:{{ '#e0e7ff' if meta.cold else '#f3f4f6' }};color:{{ '#3730a3' if meta.cold else '#6b7280' }};">
+              {{ "COLD" if meta.cold else "WARM" }}
+            </span>
+          </td>
+          <td style="padding:8px 12px;text-align:center;">
+            <span style="font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;background:{{ prio_bg }};color:{{ prio_fg }};">
+              {{ meta.priority | upper }}
+            </span>
+          </td>
+          <td style="padding:8px 12px;color:var(--ink-soft);font-size:11px;max-width:260px;">{{ meta.gap }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+{# PANEL C — Referencias de competencia (TikTok)                             #}
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+<div style="margin-bottom:28px;">
+  <div class="section-title">Referencias de Competencia</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:10px;">
+    {% for ref in competitor_refs %}
+    {% set fit_color = "#065f46" if ref.levia_fit >= 85 else ("#92400e" if ref.levia_fit >= 70 else "#6b7280") %}
+    {% set fit_bg = "#d1fae5" if ref.levia_fit >= 85 else ("#fef3c7" if ref.levia_fit >= 70 else "#f3f4f6") %}
+    <div class="card" style="padding:14px;border-left:3px solid {{ '#10b981' if ref.levia_fit >= 85 else ('#f59e0b' if ref.levia_fit >= 70 else '#9ca3af') }};">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.06em;margin-bottom:2px;">
+            @{{ ref.handle }}
+            <span style="margin-left:6px;padding:1px 6px;border-radius:8px;background:{{ '#e0e7ff' if ref.lang == 'ES' else '#f3f4f6' }};color:{{ '#3730a3' if ref.lang == 'ES' else '#6b7280' }};font-size:10px;">{{ ref.lang }}</span>
+          </div>
+          <div style="font-size:12px;font-weight:600;color:var(--ink);line-height:1.35;">{{ ref.title }}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;margin-left:10px;">
+          <div style="font-size:18px;font-weight:700;color:{{ fit_color }};">{{ ref.levia_fit }}</div>
+          <div style="font-size:10px;color:var(--ink-soft);">fit %</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">
+        <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:var(--bone-soft);color:var(--ink-soft);font-weight:500;">{{ ref.angle }}</span>
+        <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:var(--bone-soft);color:var(--ink-soft);">🧠 {{ ref.brain }}</span>
+        {% if ref.likes %}<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#f0fdf4;color:#166534;">❤ {{ "{:,}".format(ref.likes) }}</span>{% endif %}
+      </div>
+      <div style="font-size:11px;color:var(--ink-soft);margin-bottom:10px;font-style:italic;">{{ ref.adaptation }}</div>
+      <a href="{{ ref.url }}" target="_blank" rel="noopener"
+         style="font-size:11px;font-weight:600;color:var(--accent);text-decoration:none;display:inline-flex;align-items:center;gap:4px;">
+        Ver original ↗
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+{# Summary pills                                                              #}
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px;">
+  <span class="pill green">{{ live | length }} live en Meta</span>
+  <span class="pill" style="background:#e0e7ff;color:#3730a3;">{{ cold_count }} cold testing</span>
+  <span class="pill" style="background:#d1fae5;color:#065f46;">{{ high_priority_count }} prioridad alta</span>
+  <span class="pill" style="background:var(--bone-soft);color:var(--ink-soft);">{{ ready | length }} ready</span>
+  <span class="pill" style="background:var(--bone-soft);color:var(--ink-soft);">{{ total }} PNGs total</span>
+</div>
+
+{# ─── Live en Meta ───────────────────────────────────────────────────────── #}
+{% if live %}
+<div style="margin-bottom:28px;">
+  <div class="section-title">Live en Meta Ads</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;">
+    {% for c in live %}
+    <div class="card card-sm" style="cursor:pointer;" onclick="openModal('{{ c.url }}','{{ c.label }}','{{ c.angle }}','{{ c.avatar }}','{{ c.roas or '' }}','{{ c.ctr_pct or '' }}','{{ c.gap }}')">
+      <img src="{{ c.url }}" alt="{{ c.label }}"
+           style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;margin-bottom:8px;" loading="lazy" />
+      <div style="font-size:11px;font-weight:600;color:var(--ink);">{{ c.frame_id }}</div>
+      <div style="font-size:11px;color:var(--ink-soft);margin-top:1px;">{{ c.label }}</div>
+      <div style="margin-top:6px;">
+        <span class="badge badge-live">LIVE</span>
+        {% if c.roas %}<span style="font-size:11px;color:#065f46;font-weight:600;margin-left:4px;">{{ c.roas }}x</span>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{# ─── Videos UGC ─────────────────────────────────────────────────────────── #}
+{% if ugc_videos %}
+<div style="margin-bottom:28px;">
+  <div class="section-title">Videos UGC Generados</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">
+    {% for v in ugc_videos %}
+    <div class="card card-sm">
+      <video src="{{ v.url }}" controls preload="metadata"
+             style="width:100%;border-radius:6px;background:#000;aspect-ratio:9/16;object-fit:cover;"></video>
+      <div style="margin-top:8px;">
+        <div style="font-size:12px;font-weight:600;color:var(--ink);">{{ v.name }}</div>
+        <div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">{{ v.week }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{# ─── Galería completa ───────────────────────────────────────────────────── #}
+<div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+    <div class="section-title" style="margin:0;">Todos los Creativos ({{ total }})</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      <button onclick="filterCreatives('all')" id="btn-all"
+              style="padding:4px 12px;border-radius:5px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--ink);color:#fff;cursor:pointer;">
+        Todos
+      </button>
+      <button onclick="filterCreatives('live')" id="btn-live"
+              style="padding:4px 12px;border-radius:5px;font-size:11px;font-weight:600;border:1px solid var(--border);background:#fff;color:var(--ink-soft);cursor:pointer;">
+        Live
+      </button>
+      <button onclick="filterCreatives('cold')" id="btn-cold"
+              style="padding:4px 12px;border-radius:5px;font-size:11px;font-weight:600;border:1px solid var(--border);background:#fff;color:var(--ink-soft);cursor:pointer;">
+        Cold
+      </button>
+      <button onclick="filterCreatives('alta')" id="btn-alta"
+              style="padding:4px 12px;border-radius:5px;font-size:11px;font-weight:600;border:1px solid var(--border);background:#fff;color:var(--ink-soft);cursor:pointer;">
+        Alta prioridad
+      </button>
+    </div>
+  </div>
+
+  <div id="gallery" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;">
+    {% for c in creatives %}
+    <div class="creative-item card card-sm"
+         data-status="{{ c.status }}"
+         data-cold="{{ 'cold' if c.cold else 'warm' }}"
+         data-priority="{{ c.priority }}"
+         style="cursor:pointer;padding:8px;"
+         onclick="openModal('{{ c.url }}','{{ c.label }}','{{ c.angle }}','{{ c.avatar }}','{{ c.roas or '' }}','{{ c.ctr_pct or '' }}','{{ c.gap | replace("'","") }}')">
+      <div style="position:relative;">
+        <img src="{{ c.url }}" alt="{{ c.label }}"
+             style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:5px;" loading="lazy" />
+        {% if c.priority == "alta" and c.cold %}
+        <div style="position:absolute;top:4px;right:4px;background:#10b981;border-radius:6px;width:8px;height:8px;" title="Alta prioridad cold"></div>
+        {% endif %}
+      </div>
+      <div style="margin-top:5px;">
+        <div style="font-size:10px;font-weight:700;color:var(--ink);">{{ c.frame_id }}</div>
+        <div style="font-size:10px;color:var(--ink-soft);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ c.angle }}">{{ c.angle if c.angle != '—' else c.label }}</div>
+        <div style="margin-top:3px;display:flex;gap:3px;flex-wrap:wrap;">
+          <span style="font-size:9px;padding:1px 5px;border-radius:8px;font-weight:600;background:{{ '#d1fae5' if c.status == 'live' else 'var(--bone-soft)' }};color:{{ '#065f46' if c.status == 'live' else 'var(--ink-soft)' }};">{{ c.status | upper }}</span>
+          {% if c.cold %}<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:#e0e7ff;color:#3730a3;font-weight:500;">COLD</span>{% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+{# ─── Modal mejorado ─────────────────────────────────────────────────────── #}
+<div id="modal" onclick="closeModal()"
+     style="display:none;position:fixed;inset:0;background:rgba(10,31,61,.6);z-index:100;backdrop-filter:blur(4px);align-items:center;justify-content:center;">
+  <div onclick="event.stopPropagation()"
+       style="background:#fff;border-radius:14px;padding:22px;max-width:560px;width:92%;max-height:92vh;overflow:auto;box-shadow:0 20px 60px rgba(10,31,61,.2);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <div id="modal-title" style="font-family:'Fraunces',serif;font-size:18px;font-weight:600;color:var(--ink);"></div>
+      <button onclick="closeModal()" style="border:none;background:none;font-size:20px;cursor:pointer;color:var(--ink-soft);line-height:1;">✕</button>
+    </div>
+    <img id="modal-img" src="" alt="" style="width:100%;border-radius:10px;margin-bottom:14px;" />
+    <div id="modal-meta" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;"></div>
+    <div id="modal-gap" style="font-size:12px;color:var(--ink-soft);padding:10px;background:var(--bone-soft);border-radius:8px;display:none;"></div>
+    <div id="modal-stats" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;"></div>
+  </div>
+</div>
+
+</div>{# /tab-inventario #}
+
+{# ═══════════ TAB: TESTING ═══════════════════════════════════════════════════ #}
+<div id="tab-testing" style="display:none;">
+
+{# ─── Stats row ──────────────────────────────────────────────────────────── #}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:24px;">
+  {% set s = testing_stats %}
+  {% for label, val, bg, fg in [
+    ("En Cola",    s.queued,       "#e0e7ff", "#3730a3"),
+    ("En Test",    s.testing,      "#d1fae5", "#065f46"),
+    ("Winners",    s.winner,       "#bbf7d0", "#14532d"),
+    ("Perdedores", s.loser,        "#fee2e2", "#991b1b"),
+    ("Pendientes", s.pending_edit, "#fef3c7", "#92400e"),
+  ] %}
+  <div style="background:{{ bg }};border-radius:10px;padding:14px 16px;">
+    <div style="font-size:22px;font-weight:700;color:{{ fg }};">{{ val }}</div>
+    <div style="font-size:11px;color:{{ fg }};opacity:.75;margin-top:2px;">{{ label }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+{# ─── Creativos en testing ───────────────────────────────────────────────── #}
+{% if testing_items %}
+<div style="margin-bottom:32px;">
+  <div class="section-title" style="margin-bottom:14px;">Creativos en Pipeline de Testing</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;">
+    {% for item in testing_items %}
+    {% set audit = item.audit %}
+    <div class="card" style="padding:0;overflow:hidden;" id="tc-{{ item.id }}">
+      {# Video player #}
+      <div style="background:#000;border-radius:10px 10px 0 0;overflow:hidden;position:relative;">
+        {% if item.url %}
+        <video src="{{ item.url }}" preload="metadata" controls
+               style="width:100%;aspect-ratio:9/16;object-fit:cover;display:block;max-height:320px;"></video>
+        {% else %}
+        <div style="width:100%;aspect-ratio:9/16;background:#1f2937;display:flex;align-items:center;justify-content:center;color:#6b7280;font-size:12px;">Sin video</div>
+        {% endif %}
+        <div style="position:absolute;top:8px;left:8px;">
+          <span style="background:{{ item.status_bg }};color:{{ item.status_fg }};border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;backdrop-filter:blur(4px);">{{ item.status_label }}</span>
+        </div>
+      </div>
+      {# Meta #}
+      <div style="padding:12px 14px;">
+        <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:4px;">{{ item.name }}</div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;">
+          {% if audit.angle %}<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#e0e7ff;color:#3730a3;font-weight:600;">{{ audit.angle }}</span>{% endif %}
+          {% if audit.avatar %}<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:var(--bone-soft);color:var(--ink-soft);">👤 {{ audit.avatar }}</span>{% endif %}
+          <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:var(--bone-soft);color:var(--ink-soft);">{{ item.type }}</span>
+        </div>
+
+        {# Audit scores — Vic Ecomillions framework #}
+        <div style="background:var(--bone-soft);border-radius:8px;padding:10px 12px;margin-bottom:10px;">
+          <div style="font-size:10px;font-weight:700;color:var(--ink-soft);letter-spacing:.06em;margin-bottom:6px;">AUDIT — VIC ECOMILLIONS</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;">
+            {% for label, key in [("Hook (0-10)", "hook_score"), ("Pain Point (0-10)", "pain_point"), ("Producto (0-10)", "product_showcase"), ("CTA (0-10)", "cta_clarity")] %}
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:10px;color:var(--ink-soft);">{{ label }}</span>
+              {% set score = audit[key] %}
+              <span style="font-size:12px;font-weight:700;color:{% if score is none %}#9ca3af{% elif score >= 8 %}#065f46{% elif score >= 6 %}#92400e{% else %}#991b1b{% endif %};">
+                {{ score if score is not none else "—" }}
+              </span>
+            </div>
+            {% endfor %}
+          </div>
+          {% if audit.total is not none %}
+          <div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--border);display:flex;justify-content:space-between;">
+            <span style="font-size:11px;font-weight:600;color:var(--ink);">Total</span>
+            <span style="font-size:14px;font-weight:700;color:{% if audit.total >= 32 %}#065f46{% elif audit.total >= 24 %}#92400e{% else %}#991b1b{% endif %};">
+              {{ audit.total }}/40
+            </span>
+          </div>
+          {% endif %}
+          {% if audit.vic_notes %}
+          <div style="margin-top:6px;font-size:10px;color:var(--ink-soft);font-style:italic;border-top:1px solid var(--border);padding-top:6px;">
+            💡 {{ audit.vic_notes }}
+          </div>
+          {% endif %}
+        </div>
+
+        {# Performance — si está en Meta #}
+        {% if item.roas or item.ctr_pct or item.spend %}
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+          {% if item.roas %}<span class="pill green">ROAS {{ item.roas }}x</span>{% endif %}
+          {% if item.ctr_pct %}<span class="pill green">CTR {{ item.ctr_pct }}%</span>{% endif %}
+          {% if item.spend %}<span class="pill" style="background:var(--bone-soft);color:var(--ink-soft);">${{ item.spend }}</span>{% endif %}
+        </div>
+        {% endif %}
+
+        {# Actions #}
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <select onchange="updateStatus('{{ item.id }}', this.value)"
+                  style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:#fff;color:var(--ink);cursor:pointer;flex:1;">
+            {% for val, lbl in [("queued","En Cola"),("pending_edit","Pendiente edición"),("testing","En Test"),("winner","Winner"),("loser","Loser")] %}
+            <option value="{{ val }}" {% if item.status == val %}selected{% endif %}>{{ lbl }}</option>
+            {% endfor %}
+          </select>
+          {% if item.meta_ad_id %}
+          <a href="https://business.facebook.com/adsmanager/manage/ads?act={{ item.meta_ad_id }}" target="_blank"
+             style="font-size:11px;padding:4px 10px;border:1px solid var(--border);border-radius:6px;text-decoration:none;color:var(--ink-soft);white-space:nowrap;">
+            Ver en Meta ↗
+          </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{# ─── Candidatos disponibles ─────────────────────────────────────────────── #}
+{% if testing_candidates %}
+<div>
+  <div class="section-title" style="margin-bottom:4px;">Candidatos Disponibles</div>
+  <div style="font-size:12px;color:var(--ink-soft);margin-bottom:14px;">
+    {{ testing_candidates | length }} videos listos para agregar al pipeline de testing
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;">
+    {% for c in testing_candidates %}
+    {% set type_bg = "#d1fae5" if c.type == "hooked" else ("#fef3c7" if c.type == "adapted" else "#f3f4f6") %}
+    {% set type_fg = "#065f46" if c.type == "hooked" else ("#92400e" if c.type == "adapted" else "#6b7280") %}
+    <div class="card card-sm" style="padding:10px;">
+      <video src="{{ c.url }}" preload="metadata"
+             style="width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:6px;background:#000;max-height:260px;display:block;margin-bottom:8px;"></video>
+      <div style="font-size:12px;font-weight:600;color:var(--ink);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ c.name }}">{{ c.name }}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span style="font-size:10px;padding:2px 7px;border-radius:8px;background:{{ type_bg }};color:{{ type_fg }};font-weight:600;">{{ c.type }}</span>
+        <span style="font-size:10px;color:var(--ink-soft);">{{ c.size_mb }} MB</span>
+      </div>
+      <button onclick="addToTesting('{{ c.source_path | replace("'","") }}','{{ c.name | replace("'","") }}','{{ c.type }}')"
+              style="width:100%;padding:6px;border:1px dashed var(--border);border-radius:6px;background:#fff;font-size:11px;font-weight:600;color:var(--ink-soft);cursor:pointer;transition:all .15s;"
+              onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'"
+              onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--ink-soft)'">
+        + Agregar a Testing
+      </button>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+</div>{# /tab-testing #}
+
+<script>
+function openModal(url, label, angle, avatar, roas, ctr, gap) {
+  document.getElementById('modal-img').src = url;
+  document.getElementById('modal-title').textContent = label || angle;
+
+  const meta = document.getElementById('modal-meta');
+  meta.innerHTML = '';
+  if (angle && angle !== '—') meta.innerHTML += `<span class="pill" style="background:#e0e7ff;color:#3730a3;font-size:11px;">${angle}</span>`;
+  if (avatar && avatar !== '—') meta.innerHTML += `<span class="pill" style="background:var(--bone-soft);color:var(--ink-soft);font-size:11px;">👤 ${avatar}</span>`;
+
+  const gapEl = document.getElementById('modal-gap');
+  if (gap && gap.length > 2) {
+    gapEl.style.display = '';
+    gapEl.textContent = '💡 ' + gap;
+  } else {
+    gapEl.style.display = 'none';
+  }
+
+  const stats = document.getElementById('modal-stats');
+  stats.innerHTML = '';
+  if (roas) stats.innerHTML += `<span class="pill green">ROAS ${roas}x</span>`;
+  if (ctr)  stats.innerHTML += `<span class="pill green">CTR ${ctr}%</span>`;
+
+  const modal = document.getElementById('modal');
+  modal.style.display = 'flex';
+}
+function closeModal() {
+  document.getElementById('modal').style.display = 'none';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+function filterCreatives(filter) {
+  document.querySelectorAll('.creative-item').forEach(el => {
+    let show = false;
+    if (filter === 'all')  show = true;
+    else if (filter === 'live') show = el.dataset.status === 'live';
+    else if (filter === 'cold') show = el.dataset.cold === 'cold';
+    else if (filter === 'alta') show = el.dataset.priority === 'alta';
+    el.style.display = show ? '' : 'none';
+  });
+  ['all','live','cold','alta'].forEach(s => {
+    const btn = document.getElementById('btn-' + s);
+    if (!btn) return;
+    btn.style.background = s === filter ? 'var(--ink)' : '#fff';
+    btn.style.color      = s === filter ? '#fff'        : 'var(--ink-soft)';
+  });
+}
+
+// ─── Tab switching ────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  ['inventario','testing'].forEach(t => {
+    document.getElementById('tab-' + t).style.display = t === tab ? '' : 'none';
+    const btn = document.getElementById('tab-btn-' + t);
+    btn.style.borderBottomColor = t === tab ? 'var(--ink)' : 'transparent';
+    btn.style.color = t === tab ? 'var(--ink)' : 'var(--ink-soft)';
+    btn.style.fontWeight = t === tab ? '700' : '600';
+  });
+  location.hash = tab === 'inventario' ? '' : tab;
+}
+
+// ─── Testing actions ──────────────────────────────────────────────────────────
+async function addToTesting(sourcePath, name, type) {
+  const btn = event.currentTarget;
+  btn.textContent = 'Agregando…';
+  btn.disabled = true;
+  try {
+    const res = await fetch('/creatives/testing/add', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({source_path: sourcePath, name, type})
+    });
+    const data = await res.json();
+    if (data.ok) {
+      btn.textContent = '✓ Agregado';
+      btn.style.background = '#d1fae5';
+      btn.style.color = '#065f46';
+      btn.style.border = '1px solid #6ee7b7';
+    } else {
+      btn.textContent = data.error || 'Error';
+      btn.disabled = false;
+    }
+  } catch(e) {
+    btn.textContent = 'Error de red';
+    btn.disabled = false;
+  }
+}
+
+async function updateStatus(id, newStatus) {
+  try {
+    await fetch(`/creatives/testing/${id}`, {
+      method: 'PATCH',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({status: newStatus})
+    });
+  } catch(e) {
+    console.error('Error actualizando status:', e);
+  }
+}
+
+// Restore tab from hash on load
+(function() {
+  const hash = location.hash.replace('#','');
+  if (hash === 'testing') switchTab('testing');
+})();
+</script>
+{% endblock %}
