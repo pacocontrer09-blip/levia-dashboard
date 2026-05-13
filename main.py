@@ -61,15 +61,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Static files
-app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
-
-# Local-only mounts: solo se activan si el directorio existe (no en cloud)
+# Static + local-only mounts — conditional for cloud compatibility
 def _mount_if_exists(path: Path, route: str, name: str):
     if path.exists():
         app.mount(route, StaticFiles(directory=str(path)), name=name)
     else:
         logger.info(f"Directorio local no disponible (cloud mode): {path}")
+
+_mount_if_exists(BASE_DIR / "static", "/static", "static")
 
 CREATIVOS_DIR    = LEVIA_DIR / "03_ADS_Y_COPY" / "creativos"
 UGC_OUTPUT_DIR   = LEVIA_DIR / "12_CREATIVOS_UGC" / "output"
