@@ -109,3 +109,71 @@ async def test_flow(flow: str, email: str):
             status_code=400,
         )
     return JSONResponse({"ok": True, "flow": flow, "email": email})
+
+
+@router.post("/subscribe")
+async def subscribe_email(request: Request):
+    """
+    Endpoint público para captura de leads desde el storefront (popup + ecosystem waitlist).
+    No requiere CSRF — valida origen por CORS y formato de email.
+    Registra en Shopify vía Admin API y dispara el welcome flow.
+    """
+    import re, httpx
+
+    try:
+        body = await request.json()
+    except Exception:
+        form = await request.form()
+        body = dict(form)
+
+    email = str(body.get("email", "")).strip().lower()
+    tags  = str(body.get("tags", "newsletter")).strip()
+
+    if not email or not re.match(r"^[^@]+@[^@]+\.[^@]+$", email):
+        return JSONResponse({"ok": False, "error": "email inválido"}, status_code=400)
+
+    if is_unsubscribed(email):
+        return JSONResponse({"ok": True, "note": "already_unsubscribed"})
+
+    # Crear/actualizar customer en Shopify Admin API
+    shopify_domain = os.getenv("SHOPIFY_STORE_DOMAIN", "zwdhr1-e8.myshopify.com")
+    shopify_token  = os.getenv("SHOPIFY_ACCESS_TOKEN", "")
+
+    shopify_ok = False
+    if shopify_token:
+        try:
+            async with httpx.AsyncClient(timeout=8) as client:
+                r = await client.post(
+                    f"https://{shopify_domain}/admin/api/2024-01/customers.json",
+                    headers={"X-Shopify-Access-Token": shopify_token, "Content-Type": "application/json"},
+                    json={"customer": {
+                        "email": email,
+                        "tags": tags,
+                        "email_marketing_consent": {
+                            "state": "subscribed",
+                            "opt_in_level": "single_opt_in",
+                        },
+                        "accepts_marketing": True,
+                    }},
+                )
+                shopify_ok = r.status_code in (200, 201, 422)  # 422 = ya existe
+        except Exception:
+            shopify_ok = False
+
+    # Disparar welcome flow siempre
+    trigger_welcome_flow({"email": email, "first_name": ""})
+
+    return JSONResponse({"ok": True, "shopify": shopify_ok}, headers={
+        "Access-Control-Allow-Origin": "https://levia.care",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+    })
+
+
+@router.options("/subscribe")
+async def subscribe_preflight():
+    return JSONResponse({}, headers={
+        "Access-Control-Allow-Origin": "https://levia.care",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+    })
