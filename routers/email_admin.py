@@ -16,13 +16,76 @@ templates = Jinja2Templates(directory="templates")
 router = APIRouter()
 
 
+def _build_leads(log: list, pending: list, unsubs: set) -> list:
+    """Agrega emails únicos con fecha de suscripción, step actual y estado."""
+    from collections import defaultdict
+
+    # Pasos enviados por email
+    sent_steps: dict[str, list] = defaultdict(list)
+    subscribed_at: dict[str, str] = {}
+    for e in log:
+        if e.get("status") != "sent":
+            continue
+        email = e.get("to", "")
+        if not email:
+            continue
+        sent_steps[email].append(e.get("template", ""))
+        # fecha más antigua = cuándo se suscribió
+        ts = e.get("ts", "")
+        if email not in subscribed_at or ts < subscribed_at[email]:
+            subscribed_at[email] = ts
+
+    # Pasos pendientes por email
+    pending_steps: dict[str, list] = defaultdict(list)
+    pending_next: dict[str, str] = {}
+    for j in pending:
+        email = j.get("email", "")
+        if email:
+            pending_steps[email].append(j)
+            # próximo envío = el más cercano
+            run_at = j.get("run_at", "")
+            if email not in pending_next or run_at < pending_next[email]:
+                pending_next[email] = run_at
+
+    all_emails = set(sent_steps.keys()) | set(pending_steps.keys())
+
+    leads = []
+    for email in all_emails:
+        steps_sent  = len(sent_steps[email])
+        steps_queue = len(pending_steps[email])
+        total_flow  = steps_sent + steps_queue
+
+        if "welcome_03" in str(sent_steps[email]):
+            flow_label = "Completo"
+            flow_color = "#065f46"
+        elif steps_sent > 0:
+            flow_label = f"Paso {steps_sent}/{total_flow}"
+            flow_color = "#6B8FB5"
+        else:
+            flow_label = "En cola"
+            flow_color = "#C8A15A"
+
+        leads.append({
+            "email":         email,
+            "subscribed_at": subscribed_at.get(email, "")[:16].replace("T", " "),
+            "flow_label":    flow_label,
+            "flow_color":    flow_color,
+            "next_send":     pending_next.get(email, "")[:16].replace("T", " "),
+            "unsubscribed":  email in unsubs,
+        })
+
+    leads.sort(key=lambda x: x["subscribed_at"], reverse=True)
+    return leads
+
+
 @router.get("/", response_class=HTMLResponse)
 async def email_dashboard(request: Request):
     pending = _load_pending()
     unsubs  = _load_unsubscribed()
-    log     = get_email_log(100)
+    log     = get_email_log(200)
     sent_total  = sum(1 for e in log if e.get("status") == "sent")
     error_total = sum(1 for e in log if e.get("status") == "error")
+    leads = _build_leads(log, pending, unsubs)
     return templates.TemplateResponse("email.html", {
         "request": request,
         "page": "email",
@@ -31,6 +94,8 @@ async def email_dashboard(request: Request):
         "error_total": error_total,
         "pending_total": len(pending),
         "unsubscribed_total": len(unsubs),
+        "leads_total": len(leads),
+        "leads": leads,
         "pending_jobs": sorted(pending, key=lambda j: j.get("run_at", "")),
         "recent_sends": log,
         "resend_missing": not os.getenv("RESEND_API_KEY"),

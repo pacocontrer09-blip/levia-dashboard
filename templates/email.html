@@ -21,7 +21,11 @@
 {% endif %}
 
 {# ── KPIs ──────────────────────────────────────────────────────────────── #}
-<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;">
+<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:24px;">
+  <div class="card" style="text-align:center;padding:20px 12px;">
+    <div style="font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">Leads</div>
+    <div style="font-size:32px;font-weight:700;color:#6B8FB5;">{{ leads_total }}</div>
+  </div>
   <div class="card" style="text-align:center;padding:20px 12px;">
     <div style="font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">Enviados</div>
     <div style="font-size:32px;font-weight:700;color:#065f46;">{{ sent_total }}</div>
@@ -38,6 +42,56 @@
     <div style="font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">Bajas</div>
     <div style="font-size:32px;font-weight:700;color:var(--ink);">{{ unsubscribed_total }}</div>
   </div>
+</div>
+
+{# ── Tabla de leads ────────────────────────────────────────────────────── #}
+<div class="card" style="margin-bottom:24px;">
+  <div style="padding:16px 20px 10px;font-size:13px;font-weight:600;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+    <span>Leads capturados{% if leads %} ({{ leads|length }}){% endif %}</span>
+    {% if leads %}
+    <span style="font-size:11px;color:var(--ink-soft);font-weight:400;">Welcome flow · 3 emails</span>
+    {% endif %}
+  </div>
+  {% if leads %}
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead>
+        <tr style="background:var(--bg-soft);">
+          <th style="padding:8px 16px;text-align:left;font-weight:500;color:var(--ink-soft);">Email</th>
+          <th style="padding:8px 16px;text-align:left;font-weight:500;color:var(--ink-soft);">Suscrito</th>
+          <th style="padding:8px 16px;text-align:left;font-weight:500;color:var(--ink-soft);">Flow</th>
+          <th style="padding:8px 16px;text-align:left;font-weight:500;color:var(--ink-soft);">Próximo email</th>
+          <th style="padding:8px 16px;text-align:left;font-weight:500;color:var(--ink-soft);">Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for l in leads %}
+        <tr style="border-top:1px solid var(--border);">
+          <td style="padding:10px 16px;font-weight:500;">{{ l.email }}</td>
+          <td style="padding:10px 16px;color:var(--ink-soft);white-space:nowrap;">{{ l.subscribed_at or "—" }}</td>
+          <td style="padding:10px 16px;">
+            <span style="padding:2px 9px;border-radius:999px;font-size:10px;font-weight:600;background:{{ l.flow_color }}22;color:{{ l.flow_color }};">
+              {{ l.flow_label }}
+            </span>
+          </td>
+          <td style="padding:10px 16px;color:var(--ink-soft);white-space:nowrap;">{{ l.next_send or "—" }}</td>
+          <td style="padding:10px 16px;">
+            {% if l.unsubscribed %}
+            <span style="color:#b91c1c;font-size:11px;">● baja</span>
+            {% else %}
+            <span style="color:#065f46;font-size:11px;">● activo</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="padding:28px 20px;text-align:center;color:var(--ink-soft);font-size:13px;">
+    Aún no hay leads capturados. El popup y el formulario de la tienda enviarán leads aquí automáticamente.
+  </div>
+  {% endif %}
 </div>
 
 {# ── Envío de prueba ───────────────────────────────────────────────────── #}
