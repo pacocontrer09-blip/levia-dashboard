@@ -6,6 +6,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from services.email_service import send_email
 
 BASE_DIR = Path(__file__).parent.parent
+(BASE_DIR / "cache").mkdir(exist_ok=True)
 PENDING_JOBS_FILE = BASE_DIR / "cache" / "pending_jobs.json"
 
 scheduler = AsyncIOScheduler(timezone="America/Mexico_City")

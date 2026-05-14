@@ -9,6 +9,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 
 BASE_DIR = Path(__file__).parent.parent
+(BASE_DIR / "cache").mkdir(exist_ok=True)
 UNSUB_FILE = BASE_DIR / "cache" / "unsubscribed.json"
 LOG_FILE   = BASE_DIR / "cache" / "email_log.json"
 TEMPLATES_DIR = BASE_DIR / "templates" / "emails"

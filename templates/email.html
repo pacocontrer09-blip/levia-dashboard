@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %}Emails — LEVIA™ Dashboard{% endblock %}
+{% block page_title %}Automatización de Email{% endblock %}
+{% block page_sub %}Resend · APScheduler · 3 flows activos{% endblock %}
+{% block topbar_right %}
+  {% if error_total > 0 %}
+  <span style="font-size:11px;color:#92400e;">⚠ {{ error_total }} errores de envío</span>
+  {% else %}
+  <span style="font-size:11px;color:#065f46;">● Sistema de email activo</span>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+
+{# ── Alerta Railway env var ─────────────────────────────────────────────── #}
+{% if resend_missing %}
+<div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:10px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:#92400e;">
+  <strong>⚠ RESEND_API_KEY no configurado en Railway.</strong>
+  Los emails están desactivados en producción. Agrégala en Railway → tu proyecto → Variables.
+</div>
+{% endif %}
+
+{# ── KPIs ──────────────────────────────────────────────────────────────── #}
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;">
+  <div class="card" style="text-align:center;padding:20px 12px;">
+    <div style="font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">Enviados</div>
+    <div style="font-size:32px;font-weight:700;color:#065f46;">{{ sent_total }}</div>
+  </div>
+  <div class="card" style="text-align:center;padding:20px 12px;">
+    <div style="font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">Errores</div>
+    <div style="font-size:32px;font-weight:700;color:{% if error_total > 0 %}#b91c1c{% else %}var(--ink){% endif %};">{{ error_total }}</div>
+  </div>
+  <div class="card" style="text-align:center;padding:20px 12px;">
+    <div style="font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">En cola</div>
+    <div style="font-size:32px;font-weight:700;color:var(--ink);">{{ pending_total }}</div>
+  </div>
+  <div class="card" style="text-align:center;padding:20px 12px;">
+    <div style="font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">Bajas</div>
+    <div style="font-size:32px;font-weight:700;color:var(--ink);">{{ unsubscribed_total }}</div>
+  </div>
+</div>
+
+{# ── Envío de prueba ───────────────────────────────────────────────────── #}
+<div class="card" style="margin-bottom:24px;padding:20px 22px;">
+  <div style="font-size:13px;font-weight:600;margin-bottom:14px;">Probar un flow</div>
+  <form id="test-form" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+    <div>
+      <label style="display:block;font-size:11px;color:var(--ink-soft);margin-bottom:4px;">Flow</label>
+      <select id="test-flow" style="padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--bg);color:var(--ink);">
+        <option value="welcome">Welcome (inmediato)</option>
+        <option value="abandoned">Abandoned Cart (inmediato)</option>
+        <option value="postpurchase">Post-Purchase (inmediato)</option>
+      </select>
+    </div>
+    <div style="flex:1;min-width:200px;">
+      <label style="display:block;font-size:11px;color:var(--ink-soft);margin-bottom:4px;">Email destino</label>
+      <input id="test-email" type="email" value="pacocontrer09@gmail.com"
+             style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--bg);color:var(--ink);box-sizing:border-box;">
+    </div>
+    <button type="submit" style="padding:8px 18px;background:var(--accent);color:#fff;border:none;border-radius:7px;font-size:13px;cursor:pointer;font-weight:500;">Enviar test</button>
+  </form>
+  <div id="test-msg" style="margin-top:10px;font-size:12px;display:none;"></div>
+</div>
+
+{# ── Jobs en cola ──────────────────────────────────────────────────────── #}
+{% if pending_jobs %}
+<div class="card" style="margin-bottom:24px;">
+  <div style="padding:16px 20px 10px;font-size:13px;font-weight:600;border-bottom:1px solid var(--border);">
+    Emails programados ({{ pending_jobs|length }})
+  </div>
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead>
+        <tr style="background:var(--bg-soft);">
+          <th style="padding:8px 14px;text-align:left;font-weight:500;color:var(--ink-soft);">Flow</th>
+          <th style="padding:8px 14px;text-align:left;font-weight:500;color:var(--ink-soft);">Email</th>
+          <th style="padding:8px 14px;text-align:left;font-weight:500;color:var(--ink-soft);">Asunto</th>
+          <th style="padding:8px 14px;text-align:left;font-weight:500;color:var(--ink-soft);">Enviar a las</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for j in pending_jobs %}
+        <tr style="border-top:1px solid var(--border);">
+          <td style="padding:9px 14px;">
+            <span style="padding:2px 8px;border-radius:999px;font-size:10px;font-weight:600;
+              background:{% if j.flow == 'welcome' %}rgba(107,143,181,.15){% elif j.flow == 'abandoned' %}rgba(200,161,90,.15){% else %}rgba(143,168,154,.15){% endif %};
+              color:{% if j.flow == 'welcome' %}#6B8FB5{% elif j.flow == 'abandoned' %}#C8A15A{% else %}#8FA89A{% endif %};">
+              {{ j.flow }}
+            </span>
+          </td>
+          <td style="padding:9px 14px;color:var(--ink-soft);">{{ j.email }}</td>
+          <td style="padding:9px 14px;">{{ j.subject }}</td>
+          <td style="padding:9px 14px;color:var(--ink-soft);white-space:nowrap;">{{ j.run_at[:16].replace("T"," ") }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card" style="margin-bottom:24px;padding:20px;text-align:center;color:var(--ink-soft);font-size:13px;">
+  No hay emails programados en cola.
+</div>
+{% endif %}
+
+{# ── Log de envíos recientes ───────────────────────────────────────────── #}
+<div class="card">
+  <div style="padding:16px 20px 10px;font-size:13px;font-weight:600;border-bottom:1px solid var(--border);">
+    Historial de envíos{% if recent_sends %} (últimos {{ recent_sends|length }}){% endif %}
+  </div>
+  {% if recent_sends %}
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead>
+        <tr style="background:var(--bg-soft);">
+          <th style="padding:8px 14px;text-align:left;font-weight:500;color:var(--ink-soft);">Fecha</th>
+          <th style="padding:8px 14px;text-align:left;font-weight:500;color:var(--ink-soft);">Email</th>
+          <th style="padding:8px 14px;text-align:left;font-weight:500;color:var(--ink-soft);">Asunto</th>
+          <th style="padding:8px 14px;text-align:left;font-weight:500;color:var(--ink-soft);">Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in recent_sends %}
+        <tr style="border-top:1px solid var(--border);">
+          <td style="padding:9px 14px;color:var(--ink-soft);white-space:nowrap;">{{ e.ts[:16].replace("T"," ") if e.ts else "—" }}</td>
+          <td style="padding:9px 14px;">{{ e.to }}</td>
+          <td style="padding:9px 14px;color:var(--ink-soft);">{{ e.subject }}</td>
+          <td style="padding:9px 14px;">
+            {% if e.status == "sent" %}
+            <span style="color:#065f46;font-weight:600;">● enviado</span>
+            {% else %}
+            <span style="color:#b91c1c;font-weight:600;" title="{{ e.error or '' }}">✕ error</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="padding:20px;text-align:center;color:var(--ink-soft);font-size:13px;">
+    Aún no hay emails enviados en el historial.
+  </div>
+  {% endif %}
+</div>
+
+<script>
+document.getElementById('test-form').addEventListener('submit', function(e) {
+  e.preventDefault();
+  var flow  = document.getElementById('test-flow').value;
+  var email = document.getElementById('test-email').value.trim();
+  var msg   = document.getElementById('test-msg');
+  if (!email) return;
+  msg.style.display = 'block';
+  msg.style.color   = 'var(--ink-soft)';
+  msg.textContent   = 'Enviando…';
+  fetch('/email/test?flow=' + encodeURIComponent(flow) + '&email=' + encodeURIComponent(email), { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      msg.style.color   = d.ok ? '#065f46' : '#b91c1c';
+      msg.textContent   = d.ok ? '✓ Flow "' + flow + '" encolado para ' + email + '. Revisa tu bandeja en unos segundos.' : 'Error: ' + JSON.stringify(d);
+    })
+    .catch(function() {
+      msg.style.color   = '#b91c1c';
+      msg.textContent   = 'Error de conexión.';
+    });
+});
+</script>
+
+{% endblock %}

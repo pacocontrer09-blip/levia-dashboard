@@ -1,5 +1,7 @@
-from fastapi import APIRouter
+import os
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.templating import Jinja2Templates
 
 from services.email_service import validate_unsubscribe_token, mark_unsubscribed, is_unsubscribed, get_email_log, _load_unsubscribed
 from services.automation_service import (
@@ -9,7 +11,30 @@ from services.automation_service import (
     _load_pending,
 )
 
+templates = Jinja2Templates(directory="templates")
+
 router = APIRouter()
+
+
+@router.get("/", response_class=HTMLResponse)
+async def email_dashboard(request: Request):
+    pending = _load_pending()
+    unsubs  = _load_unsubscribed()
+    log     = get_email_log(100)
+    sent_total  = sum(1 for e in log if e.get("status") == "sent")
+    error_total = sum(1 for e in log if e.get("status") == "error")
+    return templates.TemplateResponse("email.html", {
+        "request": request,
+        "page": "email",
+        "fetched_at": "en vivo",
+        "sent_total": sent_total,
+        "error_total": error_total,
+        "pending_total": len(pending),
+        "unsubscribed_total": len(unsubs),
+        "pending_jobs": sorted(pending, key=lambda j: j.get("run_at", "")),
+        "recent_sends": log,
+        "resend_missing": not os.getenv("RESEND_API_KEY"),
+    })
 
 _UNSUB_PAGE = """<!DOCTYPE html>
 <html lang="es">
