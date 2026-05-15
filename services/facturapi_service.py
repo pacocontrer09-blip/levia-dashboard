@@ -5,7 +5,8 @@ from datetime import date, datetime
 from pathlib import Path
 
 BASE_DIR = Path(__file__).parent.parent
-CFDI_LOG = BASE_DIR / "cache" / "cfdi_log.json"
+from services.data_dir import DATA_DIR
+CFDI_LOG = DATA_DIR / "cfdi_log.json"
 
 FACTURAPI_BASE = "https://www.facturapi.io/v2"
 SANDBOX_BASE = "https://www.facturapi.io/v2"

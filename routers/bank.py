@@ -16,7 +16,8 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, JSONResponse
 
 LEVIA_DIR = Path(__file__).parent.parent.parent
-BANK_DATA_PATH = Path(__file__).parent.parent / "cache" / "nu_transactions.json"
+from services.data_dir import DATA_DIR
+BANK_DATA_PATH = DATA_DIR / "nu_transactions.json"
 templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templates"))
 router = APIRouter()
 

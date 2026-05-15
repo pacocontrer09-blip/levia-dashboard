@@ -9,7 +9,8 @@ from services.shopify_service import get_orders_with_lineitems
 templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templates"))
 router = APIRouter()
 
-INVENTORY_PATH = Path(__file__).parent.parent / "cache" / "inventory_state.json"
+from services.data_dir import DATA_DIR
+INVENTORY_PATH = DATA_DIR / "inventory_state.json"
 COGS_USD = 26.0
 FX_DEFAULT = 17.5
 REORDER_DAYS = 30

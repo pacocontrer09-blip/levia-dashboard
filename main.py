@@ -120,8 +120,16 @@ async def setup_funda():
 
 @app.get("/health")
 async def health():
-    import time
+    from services.data_dir import DATA_DIR
     cloud_mode = not CREATIVOS_DIR.exists()
+    data_dir_writable = False
+    try:
+        test = DATA_DIR / ".health_check"
+        test.write_text("ok")
+        test.unlink()
+        data_dir_writable = True
+    except Exception:
+        pass
     checks = {
         "webhooks": True,           # Railway recibe Shopify webhooks
         "email_automation": True,   # APScheduler + Resend activo
@@ -129,11 +137,15 @@ async def health():
         "env_shopify": bool(os.getenv("SHOPIFY_TOKEN")),
         "env_meta": bool(os.getenv("META_ACCESS_TOKEN")),
         "env_resend": bool(os.getenv("RESEND_API_KEY")),
+        # Persistencia de datos
+        "data_dir": str(DATA_DIR),
+        "data_dir_writable": data_dir_writable,
+        "data_dir_persistent": str(DATA_DIR).startswith("/data"),
         # Archivos locales — solo disponibles en Mac
         "local_creativos": CREATIVOS_DIR.exists(),
         "local_ugc": UGC_OUTPUT_DIR.exists(),
     }
-    cloud_critical = ["webhooks", "email_automation", "templates", "env_shopify", "env_resend"]
+    cloud_critical = ["webhooks", "email_automation", "templates", "env_shopify", "env_resend", "data_dir_writable"]
     status = "ok" if all(checks[k] for k in cloud_critical) else "degraded"
     return JSONResponse({
         "status": status,

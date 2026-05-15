@@ -6,12 +6,9 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from services.email_service import send_email
 
-import os
 BASE_DIR = Path(__file__).parent.parent
 
-# DATA_DIR: Railway Volume si DATA_DIR=/data está en env vars, sino /app/cache (funciona en Railway sin volumen)
-DATA_DIR = Path(os.getenv("DATA_DIR", str(BASE_DIR / "cache")))
-DATA_DIR.mkdir(parents=True, exist_ok=True)
+from services.data_dir import DATA_DIR
 PENDING_JOBS_FILE = DATA_DIR / "pending_jobs.json"
 
 scheduler = AsyncIOScheduler(timezone="America/Mexico_City")

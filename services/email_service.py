@@ -11,9 +11,7 @@ from jinja2 import Environment, FileSystemLoader
 
 BASE_DIR  = Path(__file__).parent.parent
 
-# DATA_DIR: Railway Volume si DATA_DIR=/data está en env vars, sino /app/cache (funciona en Railway sin volumen)
-DATA_DIR  = Path(os.getenv("DATA_DIR", str(BASE_DIR / "cache")))
-DATA_DIR.mkdir(parents=True, exist_ok=True)
+from services.data_dir import DATA_DIR
 UNSUB_FILE = DATA_DIR / "unsubscribed.json"
 LOG_FILE   = DATA_DIR / "email_log.json"
 TEMPLATES_DIR = BASE_DIR / "templates" / "emails"
