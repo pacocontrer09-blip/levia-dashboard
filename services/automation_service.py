@@ -8,8 +8,17 @@ from services.email_service import send_email
 
 import os
 BASE_DIR = Path(__file__).parent.parent
-DATA_DIR  = Path(os.getenv("DATA_DIR", str(BASE_DIR / "cache")))
-DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+def _resolve_data_dir() -> Path:
+    """Usa /data (Railway Volume) si existe y es escribible, sino cache/ local."""
+    volume = Path("/data")
+    if volume.is_dir() and os.access(volume, os.W_OK):
+        return volume
+    fallback = BASE_DIR / "cache"
+    fallback.mkdir(parents=True, exist_ok=True)
+    return fallback
+
+DATA_DIR = _resolve_data_dir()
 PENDING_JOBS_FILE = DATA_DIR / "pending_jobs.json"
 
 scheduler = AsyncIOScheduler(timezone="America/Mexico_City")

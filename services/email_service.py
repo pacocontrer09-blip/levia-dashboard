@@ -10,9 +10,17 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 
 BASE_DIR  = Path(__file__).parent.parent
-# DATA_DIR: apunta a Railway Volume si está configurado, sino usa cache/ local
-DATA_DIR  = Path(os.getenv("DATA_DIR", str(BASE_DIR / "cache")))
-DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+def _resolve_data_dir() -> Path:
+    """Usa /data (Railway Volume) si existe y es escribible, sino cache/ local."""
+    volume = Path("/data")
+    if volume.is_dir() and os.access(volume, os.W_OK):
+        return volume
+    fallback = BASE_DIR / "cache"
+    fallback.mkdir(parents=True, exist_ok=True)
+    return fallback
+
+DATA_DIR  = _resolve_data_dir()
 UNSUB_FILE = DATA_DIR / "unsubscribed.json"
 LOG_FILE   = DATA_DIR / "email_log.json"
 TEMPLATES_DIR = BASE_DIR / "templates" / "emails"
