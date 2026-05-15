@@ -11,16 +11,9 @@ from jinja2 import Environment, FileSystemLoader
 
 BASE_DIR  = Path(__file__).parent.parent
 
-def _resolve_data_dir() -> Path:
-    """Usa /data (Railway Volume) si existe y es escribible, sino cache/ local."""
-    volume = Path("/data")
-    if volume.is_dir() and os.access(volume, os.W_OK):
-        return volume
-    fallback = BASE_DIR / "cache"
-    fallback.mkdir(parents=True, exist_ok=True)
-    return fallback
-
-DATA_DIR  = _resolve_data_dir()
+# DATA_DIR: Railway Volume si DATA_DIR=/data está en env vars, sino /app/cache (funciona en Railway sin volumen)
+DATA_DIR  = Path(os.getenv("DATA_DIR", str(BASE_DIR / "cache")))
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 UNSUB_FILE = DATA_DIR / "unsubscribed.json"
 LOG_FILE   = DATA_DIR / "email_log.json"
 TEMPLATES_DIR = BASE_DIR / "templates" / "emails"
