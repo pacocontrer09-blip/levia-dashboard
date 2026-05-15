@@ -194,10 +194,13 @@ def _restore_pending_jobs():
     jobs = _load_pending()
     if not jobs:
         return
-    now = datetime.now()
+    now = datetime.now(ZoneInfo("America/Mexico_City"))
     restored = 0
     for j in jobs:
         run_at = datetime.fromisoformat(j["run_at"])
+        # Normalizar a timezone-aware si viene sin timezone (legacy)
+        if run_at.tzinfo is None:
+            run_at = run_at.replace(tzinfo=ZoneInfo("America/Mexico_City"))
         # Past jobs fire 5 seconds from now instead of being dropped
         if run_at <= now:
             run_at = now + timedelta(seconds=5)
