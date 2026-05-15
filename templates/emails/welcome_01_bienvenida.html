@@ -68,7 +68,7 @@
               INGENIERÍA DE DESCANSO
             </p>
             <h1 class="h1" style="margin:0 0 20px 0;font-family:'Fraunces',Georgia,serif;font-size:40px;font-weight:400;line-height:1.1;color:#0A1F3D;letter-spacing:-0.01em;">
-              Bienvenido.<br>
+              {{ first_name if first_name else "Bienvenido" }}.<br>
               <em style="font-style:italic;color:#4A5B76;">Ahora descansás distinto.</em>
             </h1>
             <p style="margin:0;font-family:'Inter',sans-serif;font-size:16px;line-height:1.65;color:#4A5B76;">

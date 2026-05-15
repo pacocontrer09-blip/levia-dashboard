@@ -133,7 +133,14 @@ def trigger_abandoned_cart_flow(checkout: dict):
     product_title = "LEVIA Align"
     if checkout.get("line_items"):
         product_title = checkout["line_items"][0].get("title", product_title)
-    ctx = {"checkout_url": checkout_url, "product_title": product_title}
+    # first_name: checkout puede tenerlo en customer o billing_address
+    customer = checkout.get("customer") or {}
+    first_name = (
+        customer.get("first_name")
+        or (checkout.get("billing_address") or {}).get("first_name")
+        or ""
+    )
+    ctx = {"checkout_url": checkout_url, "product_title": product_title, "first_name": first_name}
     for i, (delay_h, template, subject) in enumerate(ABANDONED_STEPS):
         _schedule_step(f"abandoned_{email}_{i}", delay_h, email, subject, template, ctx, "abandoned", i)
     print(f"[automation] Abandoned cart flow queued for {email}")

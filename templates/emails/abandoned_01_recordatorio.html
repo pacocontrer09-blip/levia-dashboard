@@ -41,7 +41,7 @@
       <tr><td class="px-40" style="padding:64px 40px 32px 40px;">
         <p style="margin:0 0 16px 0;font-family:'Inter',sans-serif;font-size:11px;font-weight:500;letter-spacing:0.22em;text-transform:uppercase;color:#6B8FB5;">TU CARRITO</p>
         <h1 class="h1" style="margin:0 0 20px 0;font-family:'Fraunces',Georgia,serif;font-size:36px;font-weight:400;line-height:1.1;color:#0A1F3D;letter-spacing:-0.01em;">
-          Dejaste algo<br><em style="font-style:italic;color:#4A5B76;">a un clic de salir.</em>
+          {% if first_name %}{{ first_name }}, dejaste algo{% else %}Dejaste algo{% endif %}<br><em style="font-style:italic;color:#4A5B76;">a un clic de salir.</em>
         </h1>
         <p style="margin:0;font-family:'Inter',sans-serif;font-size:16px;line-height:1.65;color:#4A5B76;">
           Tu LEVIA sigue reservada. Continuá desde donde lo dejaste — sin empezar de cero.
