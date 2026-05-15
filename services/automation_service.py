@@ -52,7 +52,13 @@ def _load_pending() -> list:
 
 
 def _save_pending(jobs: list):
-    PENDING_JOBS_FILE.write_text(json.dumps(jobs, default=str))
+    """Escritura atómica: escribe a .tmp y luego renombra — evita corrupción del JSON."""
+    try:
+        tmp = PENDING_JOBS_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(jobs, default=str))
+        tmp.replace(PENDING_JOBS_FILE)
+    except Exception as e:
+        print(f"[automation] WARNING: no se pudo guardar pending_jobs: {e}")
 
 
 def _add_pending(job_id: str, flow: str, step: int, email: str,
@@ -93,8 +99,13 @@ def _cancel_pending_by_prefix(prefix: str):
 # ---------------------------------------------------------------------------
 
 async def _send_and_cleanup(job_id: str, to: str, subject: str, template: str, context: dict):
-    await send_email(to, subject, template, context)
-    _remove_pending(job_id)
+    try:
+        await send_email(to, subject, template, context)
+    except Exception as e:
+        print(f"[automation] ERROR inesperado enviando {job_id}: {e}")
+    finally:
+        # Siempre eliminar del pending — evita loops infinitos en caso de error persistente
+        _remove_pending(job_id)
 
 
 def _schedule_step(job_id: str, delay_hours: float, to: str,
@@ -171,9 +182,21 @@ def cancel_abandoned_for_email(email: str):
 # ---------------------------------------------------------------------------
 
 def start_scheduler():
-    scheduler.start()
-    _restore_pending_jobs()
-    _schedule_daily_cfdi()
+    """Inicia el scheduler. Nunca crashea el proceso — todos los errores son capturados."""
+    try:
+        scheduler.start()
+        print("[automation] Scheduler iniciado")
+    except Exception as e:
+        print(f"[automation] ERROR iniciando scheduler: {e}")
+        return  # Si el scheduler no levanta, no intentar más
+    try:
+        _restore_pending_jobs()
+    except Exception as e:
+        print(f"[automation] ERROR restaurando jobs: {e}")
+    try:
+        _schedule_daily_cfdi()
+    except Exception as e:
+        print(f"[automation] ERROR programando CFDI diario: {e}")
 
 
 def _schedule_daily_cfdi():
@@ -196,15 +219,17 @@ def _restore_pending_jobs():
         return
     now = datetime.now(ZoneInfo("America/Mexico_City"))
     restored = 0
+    skipped = 0
     for j in jobs:
-        run_at = datetime.fromisoformat(j["run_at"])
-        # Normalizar a timezone-aware si viene sin timezone (legacy)
-        if run_at.tzinfo is None:
-            run_at = run_at.replace(tzinfo=ZoneInfo("America/Mexico_City"))
-        # Past jobs fire 5 seconds from now instead of being dropped
-        if run_at <= now:
-            run_at = now + timedelta(seconds=5)
         try:
+            # Todo dentro del try: cualquier campo malformado no mata el restore
+            run_at = datetime.fromisoformat(j["run_at"])
+            # Normalizar a timezone-aware (compatible con jobs legacy sin tzinfo)
+            if run_at.tzinfo is None:
+                run_at = run_at.replace(tzinfo=ZoneInfo("America/Mexico_City"))
+            # Jobs pasados: disparar en 5 segundos en lugar de descartarlos
+            if run_at <= now:
+                run_at = now + timedelta(seconds=5)
             scheduler.add_job(
                 _send_and_cleanup,
                 "date",
@@ -215,5 +240,6 @@ def _restore_pending_jobs():
             )
             restored += 1
         except Exception as e:
-            print(f"[automation] Could not restore job {j['job_id']}: {e}")
-    print(f"[automation] Restored {restored} pending jobs on startup")
+            skipped += 1
+            print(f"[automation] Skipped job {j.get('job_id', '?')}: {e}")
+    print(f"[automation] Startup: {restored} jobs restaurados, {skipped} saltados")
