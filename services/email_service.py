@@ -1,3 +1,4 @@
+import asyncio
 import resend
 import hmac
 import hashlib
@@ -8,10 +9,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 
-BASE_DIR = Path(__file__).parent.parent
-(BASE_DIR / "cache").mkdir(exist_ok=True)
-UNSUB_FILE = BASE_DIR / "cache" / "unsubscribed.json"
-LOG_FILE   = BASE_DIR / "cache" / "email_log.json"
+BASE_DIR  = Path(__file__).parent.parent
+# DATA_DIR: apunta a Railway Volume si está configurado, sino usa cache/ local
+DATA_DIR  = Path(os.getenv("DATA_DIR", str(BASE_DIR / "cache")))
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+UNSUB_FILE = DATA_DIR / "unsubscribed.json"
+LOG_FILE   = DATA_DIR / "email_log.json"
 TEMPLATES_DIR = BASE_DIR / "templates" / "emails"
 
 resend.api_key = os.getenv("RESEND_API_KEY", "")
@@ -75,7 +78,7 @@ def validate_unsubscribe_token(token: str) -> str | None:
     try:
         payload = base64.urlsafe_b64decode(token.encode()).decode()
         email, sig = payload.rsplit(":", 1)
-        expected = hmac.new(HMAC_SECRET, email.encode(), hashlib.sha256).hexdigest()
+        expected = hmac.new(HMAC_SECRET, email.lower().encode(), hashlib.sha256).hexdigest()
         if hmac.compare_digest(sig, expected):
             return email
     except Exception:
@@ -103,12 +106,13 @@ async def send_email(to: str, subject: str, template_name: str, context: dict) -
 
     ts = datetime.now(timezone.utc).isoformat()
     try:
-        resend.Emails.send({
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, lambda: resend.Emails.send({
             "from": f"{EMAIL_FROM_NAME} <{EMAIL_FROM}>",
             "to": [to],
             "subject": subject,
             "html": html_body,
-        })
+        }))
         print(f"[email] Sent '{subject}' → {to}")
         _append_log({"ts": ts, "to": to, "subject": subject, "template": template_name, "status": "sent"})
         return True

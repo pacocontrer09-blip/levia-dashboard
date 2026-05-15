@@ -64,7 +64,7 @@ async def generate_global_cfdi(request: Request):
     orders_raw = await get_orders_historical(days=90)
     day_str = target_date.isoformat()
     day_orders = [
-        o for o in orders_raw
+        o for o in orders_raw.get("orders", [])
         if o.get("created_at", "").startswith(day_str) and o.get("financial_status") == "paid"
     ]
 
@@ -105,7 +105,7 @@ async def auto_generate_yesterday_cfdi():
     orders_raw = await get_orders_historical(days=3)
     day_str = yesterday.isoformat()
     day_orders = [
-        o for o in orders_raw
+        o for o in orders_raw.get("orders", [])
         if o.get("created_at", "").startswith(day_str) and o.get("financial_status") == "paid"
     ]
 

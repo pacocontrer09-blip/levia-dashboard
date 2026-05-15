@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+
+{% block title %}Instagram{% endblock %}
+
+{% block page_title %}Instagram @levia_care{% endblock %}
+{% block page_sub %}Cola de contenido · Calendario semanal · Publicación{% endblock %}
+
+{% block topbar_right %}
+  <span style="color:var(--ink-soft);">IG Actor ID: 17841427553703120</span>
+{% endblock %}
+
+{% block content %}
+
+{% if flash %}
+<div class="alert yellow" style="margin-bottom:20px;">{{ flash }}</div>
+{% endif %}
+
+<!-- Stats row -->
+<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:24px;">
+  <div class="card card-sm">
+    <div class="stat-label">Drafts pendientes</div>
+    <div class="stat-value">{{ drafts_count }}</div>
+    <div class="stat-sub">esperando aprobación</div>
+  </div>
+  <div class="card card-sm">
+    <div class="stat-label">Publicados esta semana</div>
+    <div class="stat-value">{{ published_this_week }}</div>
+    <div class="stat-sub">de 4 programados</div>
+  </div>
+  <div class="card card-sm">
+    <div class="stat-label">Próxima publicación</div>
+    <div class="stat-value" style="font-size:18px;">
+      {% if next_post %}{{ next_post.day }}{% else %}—{% endif %}
+    </div>
+    <div class="stat-sub">
+      {% if next_post %}{{ next_post.date }} · {{ next_post.type }}{% else %}sin programar{% endif %}
+    </div>
+  </div>
+</div>
+
+<div style="display:grid; grid-template-columns:1fr 340px; gap:24px; align-items:start;">
+
+  <!-- Left: Cola de aprobación + historial -->
+  <div>
+
+    <!-- Generar contenido -->
+    <div class="card" style="margin-bottom:20px;">
+      <div class="section-title" style="margin-bottom:16px;">Generar contenido</div>
+      <form method="POST" action="/instagram/generate" id="gen-form"
+            style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
+        <div>
+          <label style="font-size:11px;color:var(--ink-soft);font-weight:600;display:block;margin-bottom:4px;">TIPO</label>
+          <select name="content_type" style="padding:8px 12px; border:1px solid var(--border); border-radius:8px; font-size:13px; background:#fff; color:var(--ink);">
+            <option value="carousel">Carousel (Lunes)</option>
+            <option value="reel">Reel (Miércoles)</option>
+            <option value="post">Post (Viernes/Domingo)</option>
+          </select>
+        </div>
+        <div style="flex:1; min-width:220px;">
+          <label style="font-size:11px;color:var(--ink-soft);font-weight:600;display:block;margin-bottom:4px;">TEMA</label>
+          <input type="text" name="topic" placeholder="ej: Por qué duele el cuello al despertar"
+                 style="width:100%; padding:8px 12px; border:1px solid var(--border); border-radius:8px; font-size:13px; color:var(--ink);"
+                 required />
+        </div>
+        <button type="submit"
+                style="padding:8px 20px; background:var(--ink); color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap;">
+          Generar caption
+        </button>
+      </form>
+      <script>
+        document.getElementById('gen-form').addEventListener('submit', function(e) {
+          var btn = this.querySelector('button[type=submit]');
+          btn.textContent = 'Generando...';
+          btn.disabled = true;
+        });
+      </script>
+    </div>
+
+    <!-- Cola de drafts -->
+    <div class="section-title">Cola de aprobación ({{ drafts_count }})</div>
+
+    {% if not drafts %}
+    <div class="card" style="text-align:center; padding:40px; color:var(--ink-soft);">
+      <div style="font-size:24px; margin-bottom:8px;">◈</div>
+      <div style="font-size:14px;">Sin drafts pendientes.</div>
+      <div style="font-size:12px; margin-top:4px;">Genera contenido con el formulario de arriba.</div>
+    </div>
+    {% endif %}
+
+    {% for draft in drafts %}
+    <div class="card" style="margin-bottom:16px;" id="draft-{{ draft.id }}">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+        <div>
+          <span class="badge {% if draft.type == 'carousel' %}badge-live{% elif draft.type == 'reel' %}badge-pending{% else %}badge-ready{% endif %}"
+                style="margin-right:8px; text-transform:uppercase;">{{ draft.type }}</span>
+          <span style="font-size:12px; color:var(--ink-soft);">{{ draft.created_at[:10] }}</span>
+        </div>
+        <span class="pill {% if draft.status == 'draft' %}yellow{% else %}green{% endif %}">
+          {{ draft.status }}
+        </span>
+      </div>
+
+      <div style="font-size:13px; font-weight:600; color:var(--ink); margin-bottom:10px;">
+        {{ draft.topic }}
+      </div>
+
+      <!-- Caption preview -->
+      <div style="background:var(--bone-soft); border-radius:8px; padding:12px; font-size:12.5px; color:var(--ink); line-height:1.6; max-height:120px; overflow:hidden; position:relative; margin-bottom:10px;" id="caption-{{ draft.id }}">
+        {{ draft.caption[:300] }}{% if draft.caption|length > 300 %}…{% endif %}
+        <div style="position:absolute;bottom:0;left:0;right:0;height:40px;background:linear-gradient(transparent,var(--bone-soft));"></div>
+      </div>
+
+      <!-- Slides preview (carousel) -->
+      {% if draft.slides %}
+      <div style="margin-bottom:10px;">
+        <div style="font-size:11px; color:var(--ink-soft); font-weight:600; margin-bottom:6px;">SLIDES</div>
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          {% for slide in draft.slides %}
+          <div style="font-size:12px; color:var(--ink); padding:4px 8px; background:#f0ede6; border-radius:4px;">
+            <span style="color:var(--ink-soft); margin-right:6px;">{{ loop.index }}</span>{{ slide }}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Assets -->
+      {% if draft.asset_urls %}
+      <div style="display:flex; gap:8px; margin-bottom:12px; overflow-x:auto;">
+        {% for url in draft.asset_urls %}
+        <img src="{{ url }}" style="height:72px; width:72px; object-fit:cover; border-radius:6px; border:1px solid var(--border);" />
+        {% endfor %}
+      </div>
+      {% else %}
+      <div style="font-size:11.5px; color:var(--ink-soft); margin-bottom:12px; padding:6px 10px; background:#fef3c7; border-radius:6px; color:#92400e;">
+        Sin imágenes — agrega archivos a <code>content/{{ draft.id }}/assets/</code> antes de publicar
+      </div>
+      {% endif %}
+
+      <!-- Hashtags -->
+      <div style="font-size:11px; color:var(--ink-soft); margin-bottom:14px;">
+        {{ draft.hashtags[:120] }}{% if draft.hashtags|length > 120 %}…{% endif %}
+      </div>
+
+      <!-- Actions -->
+      <div style="display:flex; gap:10px;">
+        <button onclick="approveContent('{{ draft.id }}')"
+                style="flex:1; padding:9px; background:var(--ink); color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer;">
+          Aprobar y mover a cola
+        </button>
+        <button onclick="rejectContent('{{ draft.id }}')"
+                style="padding:9px 16px; background:transparent; color:#991b1b; border:1px solid #fca5a5; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer;">
+          Rechazar
+        </button>
+      </div>
+    </div>
+    {% endfor %}
+
+    <!-- Historial de aprobados -->
+    {% if approved %}
+    <div class="section-title" style="margin-top:28px;">Últimos aprobados</div>
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Tipo</th>
+            <th>Tema</th>
+            <th>Aprobado</th>
+            <th>Post ID</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in approved %}
+          <tr>
+            <td style="font-size:12px; color:var(--ink-soft);">{{ a.id }}</td>
+            <td><span class="badge badge-ready">{{ a.type }}</span></td>
+            <td style="max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ a.topic }}</td>
+            <td style="font-size:12px;">{{ a.published_at[:10] if a.published_at else '—' }}</td>
+            <td style="font-size:12px; color:var(--ink-soft);">{{ a.ig_post_id or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <!-- Right: Calendario semanal -->
+  <div>
+    <div class="section-title">Calendario semanal</div>
+    <div class="card" style="padding:0; overflow:hidden;">
+      {% if calendar_week %}
+      {% for day in calendar_week %}
+      <div style="padding:14px 16px; border-bottom:1px solid var(--border); {% if day.is_today %}background:rgba(107,143,181,.08);{% endif %}">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <span style="font-size:12px; font-weight:600; color:{% if day.is_today %}var(--accent){% elif day.is_past %}var(--ink-soft){% else %}var(--ink){% endif %};">
+            {{ day.day }} {{ day.date[5:] }}
+          </span>
+          <span class="badge {% if day.type == 'carousel' %}badge-live{% elif day.type == 'reel' %}badge-pending{% else %}badge-ready{% endif %}" style="font-size:10px;">
+            {{ day.type }}
+          </span>
+        </div>
+        <div style="font-size:12px; color:var(--ink-soft); line-height:1.4;">
+          {{ day.topic[:60] }}{% if day.topic|length > 60 %}…{% endif %}
+        </div>
+        {% if day.is_today %}
+        <div style="margin-top:8px;">
+          <button onclick="fillForm('{{ day.type }}', '{{ day.topic|replace("'", "\\'") }}')"
+                  style="font-size:11px; padding:4px 10px; background:var(--accent); color:#fff; border:none; border-radius:6px; cursor:pointer;">
+            Generar hoy
+          </button>
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+      {% else %}
+      <div style="padding:24px; text-align:center; color:var(--ink-soft); font-size:13px;">
+        No hay publicaciones esta semana en el calendario
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Quick tips -->
+    <div class="card" style="margin-top:16px; background:var(--bone-soft); border:none;">
+      <div style="font-size:11px; color:var(--ink-soft); font-weight:600; margin-bottom:8px;">NOTAS</div>
+      <div style="font-size:12px; color:var(--ink-soft); line-height:1.7;">
+        Publicar 7–9 AM o 7–9 PM CDMX<br>
+        Caption máx 2,200 chars<br>
+        Carousel: 2–10 imágenes, misma relación<br>
+        Reels: MP4 H.264, 3–90s
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function approveContent(id) {
+  if (!confirm('¿Mover "' + id + '" a aprobados?')) return;
+  fetch('/instagram/approve/' + id, { method: 'POST' })
+    .then(r => r.json())
+    .then(d => {
+      var el = document.getElementById('draft-' + id);
+      if (el) el.style.opacity = '0.4';
+      alert(d.message || (d.success ? 'Aprobado' : 'Error: ' + d.error));
+      if (d.success) location.reload();
+    })
+    .catch(() => alert('Error de red'));
+}
+
+function rejectContent(id) {
+  if (!confirm('¿Eliminar el draft "' + id + '"?')) return;
+  fetch('/instagram/reject/' + id, { method: 'POST' })
+    .then(r => r.json())
+    .then(d => {
+      if (d.success) {
+        var el = document.getElementById('draft-' + id);
+        if (el) el.remove();
+      } else {
+        alert('Error: ' + d.error);
+      }
+    })
+    .catch(() => alert('Error de red'));
+}
+
+function fillForm(type, topic) {
+  var sel = document.querySelector('select[name=content_type]');
+  var inp = document.querySelector('input[name=topic]');
+  if (sel) sel.value = type;
+  if (inp) inp.value = topic;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
+
+{% endblock %}

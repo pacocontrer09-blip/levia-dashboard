@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "levia-dashboard",
+      "runtimeExecutable": ".venv/bin/uvicorn",
+      "runtimeArgs": ["main:app", "--port", "8000", "--reload"],
+      "port": 8000
+    }
+  ]
+}

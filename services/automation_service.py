@@ -1,13 +1,16 @@
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from services.email_service import send_email
 
+import os
 BASE_DIR = Path(__file__).parent.parent
-(BASE_DIR / "cache").mkdir(exist_ok=True)
-PENDING_JOBS_FILE = BASE_DIR / "cache" / "pending_jobs.json"
+DATA_DIR  = Path(os.getenv("DATA_DIR", str(BASE_DIR / "cache")))
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+PENDING_JOBS_FILE = DATA_DIR / "pending_jobs.json"
 
 scheduler = AsyncIOScheduler(timezone="America/Mexico_City")
 
@@ -97,7 +100,7 @@ async def _send_and_cleanup(job_id: str, to: str, subject: str, template: str, c
 
 def _schedule_step(job_id: str, delay_hours: float, to: str,
                    subject: str, template: str, context: dict, flow: str, step: int):
-    run_at = datetime.now() + timedelta(hours=delay_hours)
+    run_at = datetime.now(ZoneInfo("America/Mexico_City")) + timedelta(hours=delay_hours)
     _add_pending(job_id, flow, step, to, template, subject, context, run_at)
     scheduler.add_job(
         _send_and_cleanup,

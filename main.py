@@ -84,10 +84,13 @@ _mount_if_exists(AGENCY_CLIPS_DIR, "/agency_clips","agency_clips")
 _mount_if_exists(AGENCY_OUT_DIR,   "/agency_out",  "agency_out")
 _mount_if_exists(META_ADS_DIR,     "/meta_ads",    "meta_ads")
 
+INSTAGRAM_CONTENT_DIR = LEVIA_DIR / "15_INSTAGRAM_AGENT" / "content"
+_mount_if_exists(INSTAGRAM_CONTENT_DIR, "/ig_content", "ig_content")
+
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 # Register routers
-from routers import overview, finance, ads, creatives, ugc, bank, ventas, inventario, webhooks, clientes, analitica, email_admin, klaviyo, sat, clarity
+from routers import overview, finance, ads, creatives, ugc, bank, ventas, inventario, webhooks, clientes, analitica, email_admin, klaviyo, sat, clarity, instagram
 
 app.include_router(overview.router)
 app.include_router(ventas.router, prefix="/ventas")
@@ -104,6 +107,7 @@ app.include_router(email_admin.router, prefix="/email")
 app.include_router(klaviyo.router, prefix="/klaviyo")
 app.include_router(sat.router)
 app.include_router(clarity.router, prefix="/clarity")
+app.include_router(instagram.router, prefix="/instagram")
 
 
 @app.get("/admin/setup-funda")

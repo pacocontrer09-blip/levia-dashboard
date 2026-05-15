@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
@@ -11,7 +12,8 @@ from services.automation_service import (
     _load_pending,
 )
 
-templates = Jinja2Templates(directory="templates")
+_BASE_DIR = Path(__file__).parent.parent
+templates = Jinja2Templates(directory=str(_BASE_DIR / "templates"))
 
 router = APIRouter()
 
@@ -201,8 +203,8 @@ async def subscribe_email(request: Request):
         return JSONResponse({"ok": True, "note": "already_unsubscribed"})
 
     # Crear/actualizar customer en Shopify Admin API
-    shopify_domain = os.getenv("SHOPIFY_STORE_DOMAIN", "zwdhr1-e8.myshopify.com")
-    shopify_token  = os.getenv("SHOPIFY_ACCESS_TOKEN", "")
+    shopify_domain = os.getenv("SHOPIFY_STORE", "zwdhr1-e8.myshopify.com")
+    shopify_token  = os.getenv("SHOPIFY_TOKEN", "")
 
     shopify_ok = False
     if shopify_token:
@@ -225,7 +227,9 @@ async def subscribe_email(request: Request):
         except Exception:
             shopify_ok = False
 
-    # Disparar welcome flow siempre
+    # Siempre disparar welcome flow desde aquí — no depender del webhook
+    # (422 = cliente ya existe → webhook customers/create nunca se dispara)
+    # Los job IDs usan replace_existing=True, así que si alguien se suscribe 2 veces simplemente se resetea
     trigger_welcome_flow({"email": email, "first_name": ""})
 
     return JSONResponse({"ok": True, "shopify": shopify_ok}, headers={
