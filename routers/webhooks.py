@@ -16,6 +16,7 @@ from services.automation_service import (
     trigger_abandoned_cart_flow,
     trigger_post_purchase_flow,
     cancel_abandoned_for_email,
+    _cancel_pending_by_prefix,
 )
 
 PIXEL_ID = os.getenv("META_PIXEL_ID", "")
@@ -119,6 +120,8 @@ async def shopify_order_paid(request: Request):
     email = customer.get("email") or order.get("email", "")
     if email:
         cancel_abandoned_for_email(email)
+        # Cancelar también welcome flow — primer comprador recibe ambos si no se cancela
+        _cancel_pending_by_prefix(f"welcome_{email}_")
 
     trigger_post_purchase_flow(order)
 

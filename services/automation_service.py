@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from pathlib import Path
+from urllib.parse import urlparse, urlencode, parse_qs, urlunparse
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from services.email_service import send_email
@@ -12,6 +13,18 @@ from services.data_dir import DATA_DIR
 PENDING_JOBS_FILE = DATA_DIR / "pending_jobs.json"
 
 scheduler = AsyncIOScheduler(timezone="America/Mexico_City")
+
+
+def _add_discount_to_url(url: str, code: str) -> str:
+    """Agrega ?discount=CODE a una URL de forma segura, sin romper params existentes."""
+    try:
+        parts = urlparse(url)
+        params = parse_qs(parts.query)
+        params["discount"] = [code]
+        new_query = urlencode({k: v[0] for k, v in params.items()})
+        return urlunparse(parts._replace(query=new_query))
+    except Exception:
+        return f"{url}?discount={code}"
 
 # ---------------------------------------------------------------------------
 # Flow definitions: (delay_hours, template_file, subject)
@@ -151,7 +164,12 @@ def trigger_abandoned_cart_flow(checkout: dict):
         or (checkout.get("billing_address") or {}).get("first_name")
         or ""
     )
-    ctx = {"checkout_url": checkout_url, "product_title": product_title, "first_name": first_name}
+    ctx = {
+        "checkout_url": checkout_url,
+        "checkout_url_vuelve10": _add_discount_to_url(checkout_url, "VUELVE10"),
+        "product_title": product_title,
+        "first_name": first_name,
+    }
     for i, (delay_h, template, subject) in enumerate(ABANDONED_STEPS):
         _schedule_step(f"abandoned_{email}_{i}", delay_h, email, subject, template, ctx, "abandoned", i)
     print(f"[automation] Abandoned cart flow queued for {email}")

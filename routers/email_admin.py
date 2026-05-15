@@ -193,8 +193,9 @@ async def subscribe_email(request: Request):
         form = await request.form()
         body = dict(form)
 
-    email = str(body.get("email", "")).strip().lower()
-    tags  = str(body.get("tags", "newsletter")).strip()
+    email      = str(body.get("email", "")).strip().lower()
+    first_name = str(body.get("first_name", body.get("name", ""))).strip().title()
+    tags       = str(body.get("tags", "newsletter")).strip()
 
     if not email or not re.match(r"^[^@]+@[^@]+\.[^@]+$", email):
         return JSONResponse({"ok": False, "error": "email inválido"}, status_code=400)
@@ -215,6 +216,7 @@ async def subscribe_email(request: Request):
                     headers={"X-Shopify-Access-Token": shopify_token, "Content-Type": "application/json"},
                     json={"customer": {
                         "email": email,
+                        "first_name": first_name,
                         "tags": tags,
                         "email_marketing_consent": {
                             "state": "subscribed",
@@ -230,7 +232,7 @@ async def subscribe_email(request: Request):
     # Siempre disparar welcome flow desde aquí — no depender del webhook
     # (422 = cliente ya existe → webhook customers/create nunca se dispara)
     # Los job IDs usan replace_existing=True, así que si alguien se suscribe 2 veces simplemente se resetea
-    trigger_welcome_flow({"email": email, "first_name": ""})
+    trigger_welcome_flow({"email": email, "first_name": first_name})
 
     return JSONResponse({"ok": True, "shopify": shopify_ok}, headers={
         "Access-Control-Allow-Origin": "https://levia.care",
